@@ -1016,7 +1016,7 @@ static void startupMaster (tmr_t* tmr) {
     atexit(leds_off);
     // Wait until slaves are up
     //startupMaster2(tmr);
-    rt_setTimerCb(tmr, rt_millis_ahead(200), startupMaster2); 
+    rt_setTimerCb(tmr, rt_millis_ahead(200), startupMaster2);
 }
 
 
@@ -1218,18 +1218,18 @@ int sys_main (int argc, char** argv) {
     int isSlave = 0;
 #endif
 
-    if( !isSlave ) {
-        if( !force ) {
-            int pid = readPid();
-            if( pid && kill(pid, 0) == 0 ) {
-                // Some process is still running
-                fprintf(stderr, "A station with pid=%d is still running (use -f to take over)\n", pid);
-                exit(EXIT_NOP);
-            }
-        } else {
-            killOldPid();
-        }
-    }
+    // if( !isSlave ) {
+    //     if( !force ) {
+    //         int pid = readPid();
+    //         if( pid && kill(pid, 0) == 0 ) {
+    //             // Some process is still running
+    //             fprintf(stderr, "A station with pid=%d is still running (use -f to take over)\n", pid);
+    //             exit(EXIT_NOP);
+    //         }
+    //     } else {
+    //         killOldPid();
+    //     }
+    // }
 
     setupConfigFilenames();
     checkRollForward();
