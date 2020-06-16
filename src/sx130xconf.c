@@ -259,6 +259,8 @@ static void parse_sx130x_conf (ujdec_t* D, struct sx130xconf* sx130xconf) {
         }
         case J_clksrc: {
             sx130xconf->boardconf.clksrc = uj_intRange(D, 0, LGW_RF_CHAIN_NB-1);
+            // MTAC and MTCAP use radio 0 for clock
+            sx130xconf->boardconf.clksrc = 0;
             break;
         }
 #if defined(CFG_sx1302)
