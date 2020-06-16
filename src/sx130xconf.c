@@ -215,9 +215,11 @@ static void parse_ifconf (ujdec_t* D, struct lgw_conf_rxif_s* ifconf) {
 }
 
 static void setDevice (struct sx130xconf* sx130xconf, str_t device) {
+
     str_t dev = sys_radioDevice(device);
     int sz = sizeof(sx130xconf->device);
     int n = snprintf(sx130xconf->device, sz, "%s", dev);
+
     if( n > sz-1 )
         LOG(ERROR, "Device string too long (max %d chars): %s", sz-1, dev);
 #if defined(CFG_sx1302)
@@ -226,6 +228,9 @@ static void setDevice (struct sx130xconf* sx130xconf, str_t device) {
     if( n > sz-1 )
         LOG(ERROR, "Device string too long (max %d chars): %s", sz-1, dev);
 #endif
+
+    lgw_spi_set_path(dev);
+
     rt_free((void*)dev);
 }
 
@@ -418,6 +423,7 @@ int sx130xconf_parse_setup (struct sx130xconf* sx130xconf, int slaveIdx,
     }
     parse_sx130x_conf(&D, sx130xconf);
     uj_assertEOF(&D);
+
     return 1;
 }
 
@@ -506,7 +512,7 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
 #if defined(CFG_smtcpico)
     // Picocell needs some time to start up from reset before we can connect
     sys_usleep(rt_millis(250));
-    log_flushIO();  // lgw_connect might block - make sure log output is flushed 
+    log_flushIO();  // lgw_connect might block - make sure log output is flushed
     lgw_connect(sx130xconf->device);
     sys_usleep(rt_millis(250));
     // Force a reset because MCU software may be in a weird state when we connect the first time
@@ -655,7 +661,9 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
 #if defined(CFG_sx1302)
     (void) sys_deviceMode; // TODO: Add device mode to sx1302 hal
 #else
+#if !defined(CFG_prod)
     lgwx_device_mode = sys_deviceMode;
+#endif
 #endif
     ustime_t t0 = rt_getTime();
     int err = lgw_start();
