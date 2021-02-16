@@ -637,6 +637,7 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
                 // Something went wrong - should be emitting
                 LOG(MOD_S2E|ERROR, "%J - radio is not emitting frame - abandoning TX, trying alternative", curr);
                 ral_txabort(txunit);
+                curr->txflags &= ~TXFLAG_TXING;
                 goto check_alt;
             }
             // Looks like it's on air
