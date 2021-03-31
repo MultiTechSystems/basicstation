@@ -50,6 +50,8 @@
 #define FSK_FDEV      25  // [kHz]
 #define FSK_PRMBL_LEN 5
 
+struct sx130xconf sx130xconf;
+
 static const u2_t SF_MAP[] = {
     [SF12 ]= DR_LORA_SF12,
     [SF11 ]= DR_LORA_SF11,
@@ -172,15 +174,20 @@ static s2_t       txpowAdjust;    // scaled by TXPOW_SCALE
 static sL_t       last_xtime;
 static tmr_t      rxpollTmr;
 static tmr_t      syncTmr;
+static tmr_t      tempTmr;
 
 
-
-// ATTR_FASTCODE 
+// ATTR_FASTCODE
 static void synctime (tmr_t* tmr) {
     timesync_t timesync;
     int quality = ral_getTimesync(pps_en, &last_xtime, &timesync);
     ustime_t delay = ts_updateTimesync(0, quality, &timesync);
     rt_setTimer(&syncTmr, rt_micros_ahead(delay));
+}
+
+static void updatetemp(tmr_t tmr) {
+    update_temp_comp_value(&sx130xconf.tx_temp_lut);
+    rt_setTimer(&tempTmr, rt_micros_ahead(TEMP_COMP_UPDATE));
 }
 
 u1_t ral_altAntennas (u1_t txunit) {
@@ -214,7 +221,17 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
     pkt_tx.no_crc     = !txjob->addcrc;
     pkt_tx.no_header  = false;
     pkt_tx.size       = txjob->len;
+    pkt_tx.dig_gain = -1;
     memcpy(pkt_tx.payload, &s2ctx->txq.txdata[txjob->off], pkt_tx.size);
+
+    if (sx130xconf.tx_temp_lut.temp_comp_enabled) {
+        int8_t rf_power;
+        int8_t dig_gain;
+        lookup_power_settings(&sx130xconf.tx_temp_lut, pkt_tx.rf_power, &rf_power, &dig_gain);
+        LOG(XDEBUG, "Temp Tx Comp temp=%dC rf=%f idx=%d dig=%d pa=%d mix=%d", sx130xconf.tx_temp_lut.temp_comp_value, pkt_tx.rf_power, rf_power, dig_gain, sx130xconf.tx_temp_lut.lut[rf_power].pa_gain, sx130xconf.tx_temp_lut.lut[rf_power].mix_gain);
+        pkt_tx.dig_gain = dig_gain;
+        pkt_tx.rf_power = rf_power;
+    }
 
     // NOTE: nocca not possible to implement with current libloragw API
 #if defined(CFG_sx1302)
@@ -260,7 +277,7 @@ void ral_txabort (u1_t txunit) {
 #endif
 }
 
-//ATTR_FASTCODE 
+//ATTR_FASTCODE
 static void rxpolling (tmr_t* tmr) {
     int rounds = 0;
     while(rounds++ < RAL_MAX_RXBURST) {
@@ -334,21 +351,34 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
     while( (slaveIdx = uj_nextSlot(&D)) >= 0 ) {
         dbuf_t json = uj_skipValue(&D);
         if( slaveIdx == 0 ) {
-            struct sx130xconf sx130xconf;
             int status = 0;
 
-            if( (status = !sx130xconf_parse_setup(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 0) ||
-                (status = !sx130xconf_challoc(&sx130xconf, upchs)    << 1) ||
-                (status = !sys_runRadioInit(sx130xconf.device)       << 2) ||
-                (status = !sx130xconf_start(&sx130xconf, cca_region) << 3) ) {
+            // Zero and setup some defaults
+            memset(&sx130xconf, 0, sizeof(sx130xconf));
+
+            if( (status = !sx130xconf_parse_tcomp(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 0) ||
+                (status = !sx130xconf_parse_setup(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 1) ||
+                (status = !sx130xconf_challoc(&sx130xconf, upchs)    << 2) ||
+                (status = !sys_runRadioInit(sx130xconf.device)       << 3) ||
+                (status = !sx130xconf_start(&sx130xconf, cca_region) << 4) ) {
                 LOG(MOD_RAL|ERROR, "ral_config failed with status 0x%02x", status);
             } else {
+
                 // Radio started
                 txpowAdjust = sx130xconf.txpowAdjust;
                 pps_en = sx130xconf.pps;
+
                 last_xtime = ts_newXtimeSession(0);
                 rt_yieldTo(&rxpollTmr, rxpolling);
                 rt_yieldTo(&syncTmr, synctime);
+
+                if (sx130xconf.tx_temp_lut.temp_comp_enabled) {
+                    sx130xconf.tx_temp_lut.temp_comp_value = 20;
+                    strncpy(sx130xconf.tx_temp_lut.temp_comp_file, DEFAULT_TEMP_COMP_FILE, sizeof(sx130xconf.tx_temp_lut.temp_comp_file)-1);
+                    update_temp_comp_value(&sx130xconf.tx_temp_lut);
+                    rt_yieldTo(&tempTmr, updatetemp);
+                }
+
                 ok = 1;
             }
         }
@@ -364,6 +394,7 @@ void ral_ini() {
     last_xtime = 0;
     rt_iniTimer(&rxpollTmr, rxpolling);
     rt_iniTimer(&syncTmr, synctime);
+    rt_iniTimer(&tempTmr, updatetemp);
 }
 
 void ral_stop() {
@@ -371,6 +402,7 @@ void ral_stop() {
     last_xtime = 0;
     rt_clrTimer(&rxpollTmr);
     rt_clrTimer(&syncTmr);
+    rt_clrTimer(&tempTmr);
 }
 
 #endif // defined(CFG_ral_lgw)

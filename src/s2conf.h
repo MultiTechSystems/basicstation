@@ -193,6 +193,7 @@ CONF_PARAM(TX_MAX_AHEAD        , ustime, tspan_s ,    DFLT_TX_MAX_AHEAD, "maximu
 CONF_PARAM(TXCHECK_FUDGE       , ustime, tspan_s ,   DFLT_TXCHECK_FUDGE, "check radio state this time into ongoing TX")
 CONF_PARAM(BEACON_INTVL        , ustime, tspan_s ,    DFLT_BEACON_INTVL, "beaconing interval")
 CONF_PARAM(TLS_SNI             ,     u4,    bool ,               "true", "Set and verify server name of TLS connections")
+CONF_PARAM(TEMP_COMP_UPDATE    , ustime, tspan_s ,             "\"5m\"", "interval for updating temperature")
 
 #endif // _s2conf_x_
 

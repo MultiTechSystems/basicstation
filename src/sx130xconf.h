@@ -45,9 +45,54 @@
 #define SX130X_ANT_SECTOR 2
 #define SX130X_ANT_UNDEF  3
 
+
+#define TEMP_LUT_SIZE_MAX 13
+#define DEFAULT_TEMP_COMP_TYPE "SENSOR"
+#define DEFAULT_TEMP_COMP_FILE "/sys/class/hwmon/hwmon0/temp1_input"
+
+
+
+/**
+@struct lgw_tx_alt_gain_s
+@brief Structure containing all gains of Tx chain
+*/
+struct lgw_tx_alt_gain_s {
+    uint8_t pa_gain;    /*!> 2 bits, control of the external PA (SX1301 I/O) */
+    uint8_t dac_gain;   /*!> 2 bits, control of the radio DAC */
+    uint8_t mix_gain;   /*!> 4 bits, control of the radio mixer */
+    uint8_t dig_gain;   /*!> 2 bits, control of the radio DIG */
+    int8_t  rf_power;   /*!> measured TX power at the board connector, in dBm */
+};
+
+/**
+@struct lgw_tx_alt_gain_lut_s
+@brief Structure defining the Tx gain LUT
+*/
+struct lgw_tx_alt_gain_lut_s {
+    float                       dig_gain[64];
+    int8_t                      temp;
+    uint8_t                     size;                       /*!> Number of LUT indexes */
+};
+
+/**
+@struct lgw_tx_alt_gain_lut_s
+@brief Structure defining the Tx gain LUT
+*/
+struct lgw_tx_temp_lut_s {
+    struct lgw_tx_alt_gain_s        lut[TX_GAIN_LUT_SIZE_MAX]; /*!> Array of Tx gain struct */
+    struct lgw_tx_alt_gain_lut_s    dig[TEMP_LUT_SIZE_MAX];     /*!> Array of Tx gain struct */
+    uint8_t                         size;                       /*!> Number of LUT indexes */
+    char temp_comp_type[16];
+    uint8_t temp_comp_file_type;
+    char temp_comp_file[128];
+    int temp_comp_value;
+    bool temp_comp_enabled;
+};
+
 struct sx130xconf {
     struct lgw_conf_board_s  boardconf;
     struct lgw_tx_gain_lut_s txlut;
+    struct lgw_tx_temp_lut_s tx_temp_lut;
     struct lgw_conf_rxrf_s   rfconf[LGW_RF_CHAIN_NB];
     struct lgw_conf_rxif_s   ifconf[LGW_IF_CHAIN_NB];
 #if !defined(CFG_sx1302)
@@ -64,7 +109,11 @@ extern str_t station_conf_USAGE;
 int  sx130xconf_parse_setup (struct sx130xconf* sx130xconf, int slaveIdx, str_t hwspec, char* json, int jsonlen);
 int  sx130xconf_challoc (struct sx130xconf* sx130xconf, chdefl_t* upchs);
 int  sx130xconf_start (struct sx130xconf* sx130xconf, u4_t region);
+int  sx130xconf_parse_tcomp (struct sx130xconf* sx130xconf, int slaveIdx, str_t hwspec, char* json, int jsonlen);
 
+
+void lookup_power_settings(void* ctx, float tx_pwr, int8_t* rf_power, int8_t* dig_gain);
+void update_temp_comp_value(void* ctx);
 
 #endif // defined(CFG_lgw1)
 #endif // _sx130xconf_h_

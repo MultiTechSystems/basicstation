@@ -274,6 +274,14 @@ static void parse_sx130x_conf (ujdec_t* D, struct sx130xconf* sx130xconf) {
             break;
         }
 #endif
+        case J_antenna_gain:   {
+            float gain = uj_num(D);
+            if (gain != 0.0) {
+                LOG(MOD_RAL|WARNING, "ANT GAIN=%fdBi", gain);
+                sx130xconf->txpowAdjust = (s2_t)(gain*TXPOW_SCALE);
+            }
+            break;
+        }
         case J_chan_FSK: {
             parse_ifconf(D, &sx130xconf->ifconf[LGW_MULTI_NB+1]);
             break;
@@ -297,7 +305,7 @@ static void parse_sx130x_conf (ujdec_t* D, struct sx130xconf* sx130xconf) {
                 parse_rfconf(D, sx130xconf, n);
                 break;
             }
-            LOG(MOD_RAL|WARNING, "Ignoring unsupported/unknown field: %s", D->field.name);
+            LOG(MOD_RAL|WARNING, "[parse_sx130x] Ignoring unsupported/unknown field: %s", D->field.name);
             uj_skipValue(D);
             break;
         }
@@ -336,7 +344,7 @@ static int find_sx130x_conf (str_t filename, struct sx130xconf* sx130xconf) {
             break;
         }
         default: {
-            LOG(MOD_RAL|WARNING, "Ignoring unsupported/unknown field: %s", D.field.name);
+            LOG(MOD_RAL|WARNING, "[find_sx130x] Ignoring unsupported/unknown field: %s", D.field.name);
             uj_skipValue(&D);
             break;
         }
@@ -347,6 +355,8 @@ static int find_sx130x_conf (str_t filename, struct sx130xconf* sx130xconf) {
     rt_free(jbuf.buf);
     return 1;
 }
+
+
 
 
 static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
@@ -396,6 +406,187 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
     return 1;
 }
 
+static void parse_lutconf(ujdec_t* D, struct lgw_tx_alt_gain_s* tx_alt_gain) {
+    ujcrc_t field;
+    uj_enterObject(D);
+    while( (field = uj_nextField(D)) ) {
+        switch(field) {
+        case J_rf_power: {
+            tx_alt_gain->rf_power = uj_intRange(D, 0, 30);
+            break;
+        }
+         case J_pa_gain: {
+            tx_alt_gain->pa_gain = uj_intRange(D, 0, 3);
+            break;
+        }
+         case J_mix_gain: {
+            tx_alt_gain->mix_gain = uj_intRange(D, 8, 15);
+            break;
+        }
+         case J_dig_gain: {
+            uj_skipValue(D);
+            break;
+        }
+        default: {
+            LOG(MOD_RAL|WARNING, "[LUTCONF] Ignoring unsupported/unknown field: %s", D->field.name);
+            uj_skipValue(D);
+            break;
+        }
+        }
+    }
+    tx_alt_gain->dig_gain = 0;
+    tx_alt_gain->dac_gain = 3;
+    uj_exitObject(D);
+}
+
+static void parse_lutarray(ujdec_t* D, int n, struct lgw_tx_alt_gain_lut_s* tx_alt_gain_lut) {
+
+    int slot;
+    uj_enterArray(D);
+    while( (slot = uj_nextSlot(D)) >= 0 ) {
+        tx_alt_gain_lut->dig_gain[slot] = uj_num(D);
+    }
+
+    tx_alt_gain_lut->temp = n;
+    tx_alt_gain_lut->size = 64;
+    uj_exitArray(D);
+}
+
+static void parse_sx130x_tcomp_conf (ujdec_t* D, struct lgw_tx_temp_lut_s* temp_lut_s) {
+
+    ujcrc_t field;
+    uj_enterObject(D);
+    int lut_index = 0;
+    while( (field = uj_nextField(D)) ) {
+        switch(field) {
+        case J_LUT_BASE: {
+            uj_enterObject(D);
+            break;
+        }
+        default: {
+            int n = uj_indexedField(D, "tx_lut_");
+            if( n >= 0 ) {
+                parse_lutconf(D, &temp_lut_s->lut[n]);
+                temp_lut_s->size = 16;
+                if (n == 15)
+                    uj_exitObject(D);
+                break;
+            }
+            n = uj_indexedField(D, "LUT-");
+            if( n >= 0 ) {
+                // Read json array
+                parse_lutarray(D, -n, &temp_lut_s->dig[lut_index++]);
+                break;
+            }
+            n = uj_indexedField(D, "LUT");
+            if( n >= 0 ) {
+                // Read json array
+                parse_lutarray(D, n, &temp_lut_s->dig[lut_index++]);
+                break;
+            }
+            LOG(MOD_RAL|WARNING, "[TCOMP] Ignoring unsupported/unknown field: %s", D->field.name);
+            uj_skipValue(D);
+            break;
+        }
+        }
+    }
+    uj_exitObject(D);
+}
+
+static int find_sx130x_tcomp_conf (str_t filename, struct lgw_tx_temp_lut_s* tx_temp_lut) {
+    dbuf_t jbuf = sys_readFile(filename);
+    if( jbuf.buf == NULL )
+        return 0;
+    ujdec_t D;
+    uj_iniDecoder(&D, jbuf.buf, jbuf.bufsize);
+    if( uj_decode(&D) ) {
+        LOG(MOD_RAL|ERROR, "Parsing of JSON failed - '%s' ignored", filename);
+        free(jbuf.buf);
+        return 0;
+    }
+
+    parse_sx130x_tcomp_conf(&D, tx_temp_lut);
+
+    uj_assertEOF(&D);
+    rt_free(jbuf.buf);
+    return 1;
+}
+
+int sx130xconf_parse_tcomp (struct sx130xconf* sx130xconf, int slaveIdx,
+                            str_t hwspec, char* json, int jsonlen) {
+    if( strcmp(hwspec, "sx1301/1") != 0 ) {
+        LOG(MOD_RAL|ERROR, "Unsupported hwspec: %s", hwspec);
+        return 0;
+    }
+
+    if( !find_sx130x_tcomp_conf("temp_lut.json", &sx130xconf->tx_temp_lut)) {
+        sx130xconf->tx_temp_lut.temp_comp_enabled = false;
+        return 1;
+    }
+
+    sx130xconf->tx_temp_lut.temp_comp_enabled = true;
+    return 1;
+}
+
+
+void lookup_power_settings(void* ctx, float tx_pwr, int8_t* rf_power, int8_t* dig_gain) {
+    float min_diff = 99;
+
+    if( ctx == NULL ) return;
+    struct lgw_tx_temp_lut_s* tx_temp_lut = (struct lgw_tx_temp_lut_s*)ctx;
+
+    for (int i = 0; i < TEMP_LUT_SIZE_MAX; i++) {
+        // If the current temp is lower than the first temp or we reach the end of the table
+        if ((tx_temp_lut->dig[0].temp > tx_temp_lut->temp_comp_value || i == TEMP_LUT_SIZE_MAX-1) ||
+            (tx_temp_lut->dig[i].temp <= tx_temp_lut->temp_comp_value && tx_temp_lut->dig[i+1].temp > tx_temp_lut->temp_comp_value)) {
+            for (int j = 0; j < TX_GAIN_LUT_SIZE_MAX; j++) {
+                for (int h = 0; h < 4; h++) {
+                    if (tx_pwr >= tx_temp_lut->dig[i].dig_gain[j*4+h] && (tx_pwr - tx_temp_lut->dig[i].dig_gain[j*4+h]) < min_diff) {
+                        min_diff = (tx_pwr - tx_temp_lut->dig[i].dig_gain[j*4+h]);
+                        *rf_power = j;
+                        *dig_gain = h;
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    if (min_diff == 99) {
+        // minimum output if no match was found
+        *rf_power = 0;
+        *dig_gain = 3;
+    }
+}
+
+void update_temp_comp_value(void* ctx) {
+    if( ctx == NULL ) return;
+    struct lgw_tx_temp_lut_s* tx_temp_lut = (struct lgw_tx_temp_lut_s*)ctx;
+
+    if (!tx_temp_lut->temp_comp_enabled) {
+        return;
+    }
+
+    /* try to open file to read */
+    FILE *filePointer;
+
+    if ((filePointer = fopen(tx_temp_lut->temp_comp_file, "r"))) {
+        int bufferLength = 10;
+        char buffer[bufferLength];
+
+        fgets(buffer, bufferLength, filePointer);
+
+        tx_temp_lut->temp_comp_value = atoi(buffer);
+
+        if (tx_temp_lut->temp_comp_file_type == 0) {
+            // SENSOR provides a mC reading
+            tx_temp_lut->temp_comp_value = ((tx_temp_lut->temp_comp_value % 1000) >= 500 ? 1 : 0) + (tx_temp_lut->temp_comp_value / 1000);
+        }
+
+        fclose(filePointer);
+    }
+
+}
 
 int sx130xconf_parse_setup (struct sx130xconf* sx130xconf, int slaveIdx,
                             str_t hwspec, char* json, int jsonlen) {
@@ -403,8 +594,7 @@ int sx130xconf_parse_setup (struct sx130xconf* sx130xconf, int slaveIdx,
         LOG(MOD_RAL|ERROR, "Unsupported hwspec: %s", hwspec);
         return 0;
     }
-    // Zero and setup some defaults
-    memset(sx130xconf, 0, sizeof(*sx130xconf));
+
     sx130xconf->boardconf.lorawan_public = 1;
     setDevice(sx130xconf, NULL);
 
@@ -522,15 +712,26 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
 
     if( log_shallLog(MOD_RAL|VERBOSE) ) {
         LOG(MOD_RAL|DEBUG, "SX130x txlut table (%d entries)", sx130xconf->txlut.size);
+        LOG(MOD_RAL|VERBOSE, "TEMP COMP %sABLED", sx130xconf->tx_temp_lut.temp_comp_enabled ? "EN" : "DIS");
         for( int i=0; i<sx130xconf->txlut.size; i++ ) {
 #if !defined(CFG_sx1302)
-            LOG(MOD_RAL|VERBOSE,
-                "SX1301 txlut %2d:  dig_gain=%d pa_gain=%d dac_gain=%d mix_gain=%d rf_power=%d", i,
-                sx130xconf->txlut.lut[i].dig_gain,
-                sx130xconf->txlut.lut[i].pa_gain,
-                sx130xconf->txlut.lut[i].dac_gain,
-                sx130xconf->txlut.lut[i].mix_gain,
-                sx130xconf->txlut.lut[i].rf_power);
+            if (sx130xconf->tx_temp_lut.temp_comp_enabled) {
+                LOG(MOD_RAL|VERBOSE,
+                    "SX1301 txlut %2d:  dig_gain=%d pa_gain=%d dac_gain=%d mix_gain=%d rf_power=%d", i,
+                    0,
+                    sx130xconf->tx_temp_lut.lut[i].pa_gain,
+                    sx130xconf->tx_temp_lut.lut[i].dac_gain,
+                    sx130xconf->tx_temp_lut.lut[i].mix_gain,
+                    sx130xconf->tx_temp_lut.lut[i].rf_power);
+            } else {
+                LOG(MOD_RAL|VERBOSE,
+                    "SX1301 txlut %2d:  dig_gain=%d pa_gain=%d dac_gain=%d mix_gain=%d rf_power=%d", i,
+                    sx130xconf->txlut.lut[i].dig_gain,
+                    sx130xconf->txlut.lut[i].pa_gain,
+                    sx130xconf->txlut.lut[i].dac_gain,
+                    sx130xconf->txlut.lut[i].mix_gain,
+                    sx130xconf->txlut.lut[i].rf_power);
+            }
 #else
        LOG(MOD_RAL|VERBOSE,
                 "SX1302 txlut %2d:  rf_power=%d pa_gain=%d pwr_idx=%d", i,
@@ -538,7 +739,7 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
                 sx130xconf->txlut.lut[i].pa_gain,
                 sx130xconf->txlut.lut[i].pwr_idx);
 #endif
-
+            log_flushIO();
         }
 #if defined(CFG_sx1302)
         LOG(MOD_RAL|VERBOSE, "SX1302 rssi_tcomp: coeff_a=%.03f coeff_b=%.03f coeff_c=%.03f coeff_d=%.03f coeff_e=%.03f\n",
@@ -624,7 +825,19 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
 #if defined(CFG_sx1302)
         if( lgw_txgain_setconf(0, &sx130xconf->txlut) != LGW_HAL_SUCCESS ) {
 #else
-        if( lgw_txgain_setconf(&sx130xconf->txlut) != LGW_HAL_SUCCESS ) {
+
+        if (sx130xconf->tx_temp_lut.temp_comp_enabled) {
+            for (int i = 0; i < 16; i++) {
+                sx130xconf->txlut.lut[i].rf_power = sx130xconf->tx_temp_lut.lut[i].rf_power;
+                sx130xconf->txlut.lut[i].pa_gain = sx130xconf->tx_temp_lut.lut[i].pa_gain;
+                sx130xconf->txlut.lut[i].mix_gain = sx130xconf->tx_temp_lut.lut[i].mix_gain;
+                sx130xconf->txlut.lut[i].dig_gain = sx130xconf->tx_temp_lut.lut[i].dig_gain;
+                sx130xconf->txlut.lut[i].dac_gain = sx130xconf->tx_temp_lut.lut[i].dac_gain;
+            }
+            sx130xconf->txlut.size = 16;
+        }
+
+        if(lgw_txgain_setconf(&sx130xconf->txlut) != LGW_HAL_SUCCESS ) {
 #endif
             errmsg = "lgw_txgain_setconf";
             goto fail;
