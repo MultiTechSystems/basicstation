@@ -356,6 +356,10 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
             // Zero and setup some defaults
             memset(&sx130xconf, 0, sizeof(sx130xconf));
 
+            // set default antenna gain to 3.0 dBi
+            LOG(MOD_RAL|INFO, "Set default antenna gain to 3.0 dBi");
+            sx130xconf.txpowAdjust = 3.0 * TXPOW_SCALE;
+
             if( (status = !sx130xconf_parse_tcomp(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 0) ||
                 (status = !sx130xconf_parse_setup(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 1) ||
                 (status = !sx130xconf_challoc(&sx130xconf, upchs)    << 2) ||
