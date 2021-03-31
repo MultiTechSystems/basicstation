@@ -54,6 +54,21 @@ ujcrc_t calcCRC(const char* s) {
     return FINISH_CRC(crc);
 }
 
+char* replacechar(char *s,char c1,char c2)
+{
+	int i=0;
+
+   for(i=0;s[i];i++)
+	{
+		if(s[i]==c1)
+		{
+		   s[i]=c2;
+	    }
+	}
+
+    return s;
+}
+
 int main (int argc, char** argv) {
     argv++;
     argc--;
@@ -73,7 +88,7 @@ int main (int argc, char** argv) {
     printf("#define UJ_UPDATE_CRC(crc,c) %s\n", 4+STR(UPDATE_CRC(crc,c)));
     printf("#define UJ_FINISH_CRC(crc)   %s\n", 4+STR(FINISH_CRC(crc)));
     for( int i=0; i<argc; i++ ) {
-        printf("#define J_%-20s ((ujcrc_t)(0x%08X))\n", argv[i], crcs[i]);
+        printf("#define J_%-20s ((ujcrc_t)(0x%08X))\n", replacechar(argv[i], '-', '_'), crcs[i]);
     }
     return 0;
 }
