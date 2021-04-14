@@ -467,7 +467,6 @@ static void parse_sx130x_tcomp_conf (ujdec_t* D, struct lgw_tx_temp_lut_s* temp_
             int n = uj_indexedField(D, "tx_lut_");
             if( n >= 0 ) {
                 parse_lutconf(D, &temp_lut_s->lut[n]);
-                temp_lut_s->size = 16;
                 if (n == 15)
                     uj_exitObject(D);
                 break;
@@ -476,12 +475,14 @@ static void parse_sx130x_tcomp_conf (ujdec_t* D, struct lgw_tx_temp_lut_s* temp_
             if( n >= 0 ) {
                 // Read json array
                 parse_lutarray(D, -n, &temp_lut_s->dig[lut_index++]);
+                temp_lut_s->size++;
                 break;
             }
             n = uj_indexedField(D, "LUT");
             if( n >= 0 ) {
                 // Read json array
                 parse_lutarray(D, n, &temp_lut_s->dig[lut_index++]);
+                temp_lut_s->size++;
                 break;
             }
             LOG(MOD_RAL|WARNING, "[TCOMP] Ignoring unsupported/unknown field: %s", D->field.name);
@@ -535,9 +536,9 @@ void lookup_power_settings(void* ctx, float tx_pwr, int8_t* rf_power, int8_t* di
     if( ctx == NULL ) return;
     struct lgw_tx_temp_lut_s* tx_temp_lut = (struct lgw_tx_temp_lut_s*)ctx;
 
-    for (int i = 0; i < TEMP_LUT_SIZE_MAX; i++) {
+    for (int i = 0; i < tx_temp_lut->size; i++) {
         // If the current temp is lower than the first temp or we reach the end of the table
-        if ((tx_temp_lut->dig[0].temp > tx_temp_lut->temp_comp_value || i == TEMP_LUT_SIZE_MAX-1) ||
+        if ((tx_temp_lut->dig[0].temp > tx_temp_lut->temp_comp_value || i == tx_temp_lut->size-1) ||
             (tx_temp_lut->dig[i].temp <= tx_temp_lut->temp_comp_value && tx_temp_lut->dig[i+1].temp > tx_temp_lut->temp_comp_value)) {
             for (int j = 0; j < TX_GAIN_LUT_SIZE_MAX; j++) {
                 for (int h = 0; h < 4; h++) {
