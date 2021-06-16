@@ -223,8 +223,9 @@ static void setDevice (struct sx130xconf* sx130xconf, str_t device) {
     if( n > sz-1 )
         LOG(ERROR, "Device string too long (max %d chars): %s", sz-1, dev);
 #if defined(CFG_sx1302)
-    sz = sizeof(sx130xconf->boardconf.spidev_path);
-    n = snprintf(sx130xconf->boardconf.spidev_path, sz, "%s", dev);
+    sx130xconf->boardconf.com_type = 0;
+    sz = sizeof(sx130xconf->boardconf.com_path);
+    n = snprintf(sx130xconf->boardconf.com_path, sz, "%s", dev);
     if( n > sz-1 )
         LOG(ERROR, "Device string too long (max %d chars): %s", sz-1, dev);
 #endif
