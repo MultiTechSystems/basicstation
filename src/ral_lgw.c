@@ -221,9 +221,14 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
     pkt_tx.no_crc     = !txjob->addcrc;
     pkt_tx.no_header  = false;
     pkt_tx.size       = txjob->len;
+
+    #if !defined(CFG_sx1302)
     pkt_tx.dig_gain = -1;
+    #endif
+
     memcpy(pkt_tx.payload, &s2ctx->txq.txdata[txjob->off], pkt_tx.size);
 
+    #if !defined(CFG_sx1302)
     if (sx130xconf.tx_temp_lut.temp_comp_enabled) {
         int8_t rf_power;
         int8_t dig_gain;
@@ -232,6 +237,7 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
         pkt_tx.dig_gain = dig_gain;
         pkt_tx.rf_power = rf_power;
     }
+    #endif
 
     // NOTE: nocca not possible to implement with current libloragw API
 #if defined(CFG_sx1302)
@@ -370,8 +376,12 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
             LOG(MOD_RAL|INFO, "Set default antenna gain to 3.0 dBi");
             sx130xconf.txpowAdjust = 3.0 * TXPOW_SCALE;
 
+#if !defined(CFG_sx1302)
             if( (status = !sx130xconf_parse_tcomp(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 0) ||
                 (status = !sx130xconf_parse_setup(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 1) ||
+#else
+            if( (status = !sx130xconf_parse_setup(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 1) ||
+#endif
                 (status = !sx130xconf_challoc(&sx130xconf, upchs)    << 2) ||
                 (status = !sys_runRadioInit(sx130xconf.device)       << 3) ||
                 (status = !sx130xconf_start(&sx130xconf, cca_region) << 4) ) {
@@ -386,12 +396,14 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
                 rt_yieldTo(&rxpollTmr, rxpolling);
                 rt_yieldTo(&syncTmr, synctime);
 
+#if !defined(CFG_sx1302)
                 if (sx130xconf.tx_temp_lut.temp_comp_enabled) {
                     sx130xconf.tx_temp_lut.temp_comp_value = 20;
                     strncpy(sx130xconf.tx_temp_lut.temp_comp_file, DEFAULT_TEMP_COMP_FILE, sizeof(sx130xconf.tx_temp_lut.temp_comp_file)-1);
                     update_temp_comp_value(&sx130xconf.tx_temp_lut);
                     rt_yieldTo(&tempTmr, updatetemp);
                 }
+#endif
 
                 ok = 1;
             }
@@ -408,7 +420,9 @@ void ral_ini() {
     last_xtime = 0;
     rt_iniTimer(&rxpollTmr, rxpolling);
     rt_iniTimer(&syncTmr, synctime);
+#if !defined(CFG_sx1302)
     rt_iniTimer(&tempTmr, updatetemp);
+#endif
 }
 
 void ral_stop() {
@@ -416,7 +430,9 @@ void ral_stop() {
     last_xtime = 0;
     rt_clrTimer(&rxpollTmr);
     rt_clrTimer(&syncTmr);
+#if !defined(CFG_sx1302)
     rt_clrTimer(&tempTmr);
+#endif
 }
 
 #endif // defined(CFG_ral_lgw)
