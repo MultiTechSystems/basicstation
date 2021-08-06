@@ -992,7 +992,8 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
 
                 break;
             }
-            case J_US902: {
+            case J_US902:
+            case J_AU915: {
                 s2ctx->txpow = 30 * TXPOW_SCALE;
                 break;
             }
