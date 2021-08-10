@@ -65,7 +65,7 @@ static void parse_tx_gain_lut (ujdec_t* D, struct lgw_tx_gain_lut_s* txlut) {
 	            }
 #else
             case J_dig_gain: { txlut->lut[slot].dig_gain = uj_intRange(D,    0,  3); break; }
-            case J_dac_gain: { txlut->lut[slot].dac_gain = uj_intRange(D,    0,  3); break; }
+            case J_dac_gain: { txlut->lut[slot].dac_gain = 3; break; }
             case J_mix_gain: { txlut->lut[slot].mix_gain = uj_intRange(D,    0, 15); break; }
 #endif
             case J_rf_power: { txlut->lut[slot].rf_power = uj_intRange(D, -128,127); break; }
@@ -187,6 +187,9 @@ static int parse_spread_factor (ujdec_t* D) {
 static void parse_ifconf (ujdec_t* D, struct lgw_conf_rxif_s* ifconf) {
     ujcrc_t field;
     uj_enterObject(D);
+
+    memset(ifconf, 0, sizeof(struct lgw_conf_rxif_s));
+
     while( (field = uj_nextField(D)) ) {
         switch(field) {
         case J_enable:        { ifconf->enable         = uj_bool(D); break; }
@@ -284,6 +287,7 @@ static void parse_sx130x_conf (ujdec_t* D, struct sx130xconf* sx130xconf) {
             break;
         }
         case J_chan_FSK: {
+
             parse_ifconf(D, &sx130xconf->ifconf[LGW_MULTI_NB+1]);
             break;
         }

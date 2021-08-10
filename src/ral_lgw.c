@@ -370,7 +370,7 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
             int status = 0;
 
             // Zero and setup some defaults
-            memset(&sx130xconf, 0, sizeof(sx130xconf));
+            memset(&sx130xconf, 0, sizeof(struct sx130xconf));
 
             // set default antenna gain to 3.0 dBi
             LOG(MOD_RAL|INFO, "Set default antenna gain to 3.0 dBi");
