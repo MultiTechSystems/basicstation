@@ -174,7 +174,7 @@ static int read_slave_pipe (slave_t* slave, u1_t* buf, int bufsize, int expcmd, 
                 consumed = sizeof(*resp);
             }
             else {
-                
+
                 rt_fatal("Slave (%d) sent unexpected data: cmd=%d size=%d", slave_idx, hdr->cmd, dlen);
             }
             if( slave->rsb.off ) {
@@ -618,6 +618,7 @@ void ral_ini () {
     int allok = 1;
     for( int sidx=0; sidx < n_slaves; sidx++ ) {
         struct sx130xconf sx1301conf;
+        memset(&sx1301conf, 0, sizeof(struct sx130xconf));
         if( !sx130xconf_parse_setup(&sx1301conf, sidx, "sx1301/1", "{}", 2) ) {
             allok = 0;
         } else {

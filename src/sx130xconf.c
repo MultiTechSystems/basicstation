@@ -65,7 +65,7 @@ static void parse_tx_gain_lut (ujdec_t* D, struct lgw_tx_gain_lut_s* txlut) {
 	            }
 #else
             case J_dig_gain: { txlut->lut[slot].dig_gain = uj_intRange(D,    0,  3); break; }
-            case J_dac_gain: { txlut->lut[slot].dac_gain = 3; break; }
+            case J_dac_gain: { txlut->lut[slot].dac_gain = 3;  uj_intRange(D,    0,  3); break; }
             case J_mix_gain: { txlut->lut[slot].mix_gain = uj_intRange(D,    0, 15); break; }
 #endif
             case J_rf_power: { txlut->lut[slot].rf_power = uj_intRange(D, -128,127); break; }

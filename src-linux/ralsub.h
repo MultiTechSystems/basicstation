@@ -85,7 +85,7 @@ struct ral_tx_req {
     sL_t  rctx;
     u1_t  cmd;
     u1_t  txlen;
-    u1_t  txpow;
+    s2_t  txpow;
     rps_t rps;
     u4_t  freq;
     sL_t  xtime;
