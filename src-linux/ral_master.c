@@ -619,6 +619,11 @@ void ral_ini () {
     for( int sidx=0; sidx < n_slaves; sidx++ ) {
         struct sx130xconf sx1301conf;
         memset(&sx1301conf, 0, sizeof(struct sx130xconf));
+
+        // set default antenna gain to 3.0 dBi
+        LOG(MOD_RAL|INFO, "Set default antenna gain to 3.0 dBi");
+        sx1301conf.txpowAdjust = 3.0 * TXPOW_SCALE;
+
         if( !sx130xconf_parse_setup(&sx1301conf, sidx, "sx1301/1", "{}", 2) ) {
             allok = 0;
         } else {
