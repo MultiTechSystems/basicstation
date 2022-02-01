@@ -441,7 +441,7 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
                 rt_yieldTo(&rxpollTmr, rxpolling);
                 rt_yieldTo(&syncTmr, synctime);
 
-#if !defined(CFG_sx1302)
+#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim)
                 if (sx130xconf.tx_temp_lut.temp_comp_enabled) {
                     sx130xconf.tx_temp_lut.temp_comp_value = 20;
                     strncpy(sx130xconf.tx_temp_lut.temp_comp_file, DEFAULT_TEMP_COMP_FILE, sizeof(sx130xconf.tx_temp_lut.temp_comp_file)-1);
@@ -465,7 +465,7 @@ void ral_ini() {
     last_xtime = 0;
     rt_iniTimer(&rxpollTmr, rxpolling);
     rt_iniTimer(&syncTmr, synctime);
-#if !defined(CFG_sx1302)
+#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim)
     rt_iniTimer(&tempTmr, updatetemp);
 #endif
 }
@@ -474,7 +474,7 @@ void ral_stop() {
     rt_clrTimer(&syncTmr);
     last_xtime = 0;
     rt_clrTimer(&rxpollTmr);
-#if !defined(CFG_sx1302)
+#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim)
     rt_clrTimer(&tempTmr);
 #endif
     lgw_stop();
