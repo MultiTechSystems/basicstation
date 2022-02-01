@@ -1,6 +1,6 @@
 /*
  * --- Revised 3-Clause BSD License ---
- * Copyright Semtech Corporation 2020. All rights reserved.
+ * Copyright Semtech Corporation 2022. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
@@ -87,6 +87,7 @@ struct ral_tx_req {
     u1_t  txlen;
     s2_t  txpow;
     rps_t rps;
+    u1_t  addcrc;
     u4_t  freq;
     sL_t  xtime;
     u1_t  txdata[MAX_TXFRAME_LEN];
