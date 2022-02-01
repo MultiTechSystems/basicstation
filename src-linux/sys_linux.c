@@ -1240,7 +1240,7 @@ int sys_main (int argc, char** argv) {
     sys_noTC = opts->notc;
 
     int daemon = opts->daemon;
-    int force = opts->force;
+    // int force = opts->force;
     free(opts);
     opts = NULL;
 
