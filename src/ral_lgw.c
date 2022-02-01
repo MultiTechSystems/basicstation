@@ -235,7 +235,7 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
     pkt_tx.no_crc     = !txjob->addcrc;
     pkt_tx.size       = txjob->len;
 
-    #if !defined(CFG_sx1302) && !defined(CFG_variant_testsim)
+    #if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
     pkt_tx.dig_gain = -1;
     #endif
 
@@ -247,7 +247,7 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
         int8_t dig_gain;
         lookup_power_settings(&sx130xconf.tx_temp_lut, pkt_tx.rf_power, &rf_power, &dig_gain);
         LOG(XDEBUG, "Temp Tx Comp temp=%dC rf=%f idx=%d dig=%d pa=%d mix=%d", sx130xconf.tx_temp_lut.temp_comp_value, pkt_tx.rf_power, rf_power, dig_gain, sx130xconf.tx_temp_lut.lut[rf_power].pa_gain, sx130xconf.tx_temp_lut.lut[rf_power].mix_gain);
-        #if !defined(CFG_variant_testsim)
+        #if !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
         pkt_tx.dig_gain = dig_gain;
         #endif
         pkt_tx.rf_power = rf_power;
@@ -441,7 +441,7 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
                 rt_yieldTo(&rxpollTmr, rxpolling);
                 rt_yieldTo(&syncTmr, synctime);
 
-#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim)
+#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
                 if (sx130xconf.tx_temp_lut.temp_comp_enabled) {
                     sx130xconf.tx_temp_lut.temp_comp_value = 20;
                     strncpy(sx130xconf.tx_temp_lut.temp_comp_file, DEFAULT_TEMP_COMP_FILE, sizeof(sx130xconf.tx_temp_lut.temp_comp_file)-1);
@@ -465,7 +465,7 @@ void ral_ini() {
     last_xtime = 0;
     rt_iniTimer(&rxpollTmr, rxpolling);
     rt_iniTimer(&syncTmr, synctime);
-#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim)
+#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
     rt_iniTimer(&tempTmr, updatetemp);
 #endif
 }
@@ -474,7 +474,7 @@ void ral_stop() {
     rt_clrTimer(&syncTmr);
     last_xtime = 0;
     rt_clrTimer(&rxpollTmr);
-#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim)
+#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
     rt_clrTimer(&tempTmr);
 #endif
     lgw_stop();

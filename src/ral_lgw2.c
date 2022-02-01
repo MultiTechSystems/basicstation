@@ -146,7 +146,7 @@ int ral_getTimesync (u1_t pps_en, sL_t* last_xtime, timesync_t* timesync) {
     }
     u4_t hs_pps = 0;
     if( sx1301ar_get_trighs(SX1301AR_BOARD_MASTER, &hs_pps) != 0 ) hs_pps = 0;
-    
+
     sx1301ar_tref_t tref = sx1301ar_init_tref();
     sx1301ar_set_xtal_err(0,tref);
     ustime_t t0 = rt_getTime();
@@ -212,7 +212,7 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
     ral_rps2lgw(rps, &pkt_tx);
     pkt_tx.freq_hz    = txjob->freq;
     pkt_tx.count_us   = txjob->xtime;
-    pkt_tx.rf_chain   = 0;  
+    pkt_tx.rf_chain   = 0;
     pkt_tx.rf_power   = (float)(txjob->txpow - txpowAdjust) / TXPOW_SCALE;
     pkt_tx.coderate   = CR_4_5;
     pkt_tx.no_crc     = !txjob->addcrc;
@@ -253,7 +253,7 @@ static void rxpolling (tmr_t* tmr) {
     while(1) {
         sx1301ar_rx_pkt_t pkt_rx[SX1301AR_MAX_PKT_NB];
         u1_t n;
-        
+
         if( sx1301ar_fetch(0, pkt_rx, SIZE_ARRAY(pkt_rx), &n) == -1 ) {
             LOG(MOD_RAL|ERROR, "sx1301ar_fetch: %s", sx1301ar_err_message(sx1301ar_errno));
             break;
@@ -278,11 +278,11 @@ static void rxpolling (tmr_t* tmr) {
                 LOG(MOD_RAL|ERROR, "Frame size (%d) exceeds offered buffer (%d)", p->size, MAX_RXFRAME_LEN);
                 continue;
             }
-            
-            
-            
-            
-            
+
+
+
+
+
             memcpy(&TC->s2ctx.rxq.rxdata[rxjob->off], p->payload, p->size);
             rxjob->len   = p->size;
             rxjob->freq  = p->freq_hz;
@@ -294,7 +294,7 @@ static void rxpolling (tmr_t* tmr) {
                     continue;
                 }
                 rxjob->fts = p->rsig[j].fine_received ? p->rsig[j].fine_tmst : -1;
-                rxjob->rssi = (u1_t)-p->rsig[j].rssi_chan;  
+                rxjob->rssi = (u1_t)-p->rsig[j].rssi_chan;
                 rxjob->snr = p->rsig[j].snr*4;
                 rxjob->rctx = j;
             }
@@ -339,7 +339,7 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
         rt_fatal("Radio device '%s' in use by process: %d%s", device, pids[0], n>1?".. (and others)":"");
 #endif // defined(CFG_linux)
 
-#if !defined(CFG_variant_testsim)
+#if !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
     int err;
     if( (err = spi_linuxdev_open(device, /*default speed*/-1, &spiFd)) != 0 ) {
         LOG(MOD_RAL|ERROR, "Failed to open SPI device '%s': ret=%d errno=%s", device, err, strerror(errno));
@@ -372,7 +372,7 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
 
   errexit:
     if( spiFd >= 0 ) {
-#if !defined(CFG_variant_testsim)
+#if !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
         (void)spi_linuxdev_close(spiFd);
 #endif
         spiFd = -1;
