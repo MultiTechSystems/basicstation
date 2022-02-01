@@ -235,7 +235,7 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
     pkt_tx.no_crc     = !txjob->addcrc;
     pkt_tx.size       = txjob->len;
 
-    #if !defined(CFG_sx1302)
+    #if !defined(CFG_sx1302) && !defined(CFG_variant_testsim)
     pkt_tx.dig_gain = -1;
     #endif
 
@@ -247,7 +247,9 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
         int8_t dig_gain;
         lookup_power_settings(&sx130xconf.tx_temp_lut, pkt_tx.rf_power, &rf_power, &dig_gain);
         LOG(XDEBUG, "Temp Tx Comp temp=%dC rf=%f idx=%d dig=%d pa=%d mix=%d", sx130xconf.tx_temp_lut.temp_comp_value, pkt_tx.rf_power, rf_power, dig_gain, sx130xconf.tx_temp_lut.lut[rf_power].pa_gain, sx130xconf.tx_temp_lut.lut[rf_power].mix_gain);
+        #if !defined(CFG_variant_testsim)
         pkt_tx.dig_gain = dig_gain;
+        #endif
         pkt_tx.rf_power = rf_power;
     }
     #endif
