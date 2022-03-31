@@ -47,7 +47,7 @@
 #define DFLT_MAX_RXJOBS                  64
 #define DFLT_RADIODEV  "\"/dev/spidev?.0\""
 #define DFLT_TX_MIN_GAP          "\"10ms\""   // worst case for ODU as of 07.2018 (horrible SPI performance)
-#define DFLT_TX_AIM_GAP          "\"20ms\""   //  -ditto-
+#define DFLT_TX_AIM_GAP          "\"50ms\""   //  -ditto-
 #define DFLT_TX_MAX_AHEAD        "\"600s\""
 #define DFLT_TXCHECK_FUDGE        "\"5ms\""
 /* TCP keepalive */
