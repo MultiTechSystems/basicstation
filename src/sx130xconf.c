@@ -1021,7 +1021,7 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
         sx130xconf->device, sx130xconf->pps ? "en":"dis"
     );
 
-    if (com_type == LGW_COM_SPI) {
+    if (sx130xconf->boardconf.com_type == LGW_COM_SPI) {
         /* Board reset */
         if (reset_lgw_start() != LGW_HAL_SUCCESS) {
             errmsg = "lgw_reset";
