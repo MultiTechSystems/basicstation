@@ -49,6 +49,7 @@
 #define J_gateway_conf         ((ujcrc_t)(0x186A380C))
 #define J_getxtime             ((ujcrc_t)(0x286076CA))
 #define J_gps                  ((ujcrc_t)(0x00677E64))
+#define J_gps_enable           ((ujcrc_t)(0x068AEBB6))
 #define J_gpstime              ((ujcrc_t)(0xCC004EB5))
 #define J_hello                ((ujcrc_t)(0x46DBE30A))
 #define J_hwspec               ((ujcrc_t)(0xE3C2202A))
@@ -240,3 +241,5 @@
 #define J_wifi_ssid            ((ujcrc_t)(0xE60F391C))
 #define J_wifi_pass            ((ujcrc_t)(0xE13C3600))
 #define J_cups_uri             ((ujcrc_t)(0x594AB0B8))
+#define J_LUT_BASE             ((ujcrc_t)(0x4E5FF50A))
+#define J_capabilities         ((ujcrc_t)(0x1B0F1267))

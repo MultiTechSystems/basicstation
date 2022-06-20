@@ -73,6 +73,7 @@ static const char* const SLAVE_ENVS[] = {
 #endif // defined(CFG_ral_master_slave)
 
 static struct logfile logfile;
+u1_t  gpsEnabled = 0;
 static char* gpsDevice    = NULL;
 static tmr_t startupTmr;
 
@@ -728,6 +729,11 @@ static int parseStationConf () {
                 }
                 case J_gps: {
                     makeFilepath(uj_str(&D),"",&gpsDevice,0);
+                    gpsEnabled = 1;
+                    break;
+                }
+                case J_gps_enable: {
+                    gpsEnabled = uj_bool(&D);
                     break;
                 }
                 case J_pps: {
@@ -817,6 +823,56 @@ static int parseStationConf () {
     if( dcDisabled    ) s2e_dcDisabled    = dcDisabled    & 2;
     if( dwellDisabled ) s2e_dwellDisabled = dwellDisabled & 2;
     return 1;
+}
+
+
+static int deviceGPSSupport () {
+    str_t filename = "/var/run/config/device_info.json";
+    dbuf_t jbuf = sys_readFile(filename);
+    if( jbuf.buf == NULL ) {
+        LOG(MOD_SYS|ERROR, "No such file (or not readable): %s", filename);
+        return 0;
+    }
+    ujdec_t D;
+    uj_iniDecoder(&D, jbuf.buf, jbuf.bufsize);
+    if( uj_decode(&D) ) {
+        LOG(MOD_SYS|ERROR, "Parsing of JSON failed - '%s' ignored", filename);
+        free(jbuf.buf);
+        return 0;
+    }
+    u1_t ccaDisabled=0, dcDisabled=0, dwellDisabled=0;   // fields not present
+    ujcrc_t field;
+    u1_t sys_gpsSupported=0;
+    uj_enterObject(&D);
+    while( (field = uj_nextField(&D)) ) {
+        switch(field) {
+        case J_capabilities: {
+            uj_enterObject(&D);
+            while( (field = uj_nextField(&D)) ) {
+                switch(field) {
+                case J_gps: {
+                    sys_gpsSupported = uj_bool(&D);
+                    break;
+                }
+                default: {
+                    uj_skipValue(&D);
+                    break;
+                }
+                }
+            }
+            uj_exitObject(&D);
+            break;
+        }
+        default: {
+            uj_skipValue(&D);
+            break;
+        }
+        }
+    }
+    uj_exitObject(&D);
+    uj_assertEOF(&D);
+    free(jbuf.buf);
+    return sys_gpsSupported;
 }
 
 
@@ -1023,9 +1079,9 @@ static void startupMaster2 (tmr_t* tmr) {
     rt_addFeature("prod");  // certain development/test/debug features not accepted
 #endif
     sys_enableCmdFIFO(makeFilepath("~/cmd",".fifo",NULL,0));
-    if( gpsDevice ) {
+    if( gpsEnabled && deviceGPSSupport()) {
         rt_addFeature("gps");
-        sys_enableGPS(gpsDevice);
+        sys_enableGPS();
     }
     sys_iniTC();
     sys_startTC();

@@ -247,3 +247,9 @@ wifi_scan
 wifi_ssid
 wifi_pass
 cups_uri
+#----------------------------------------
+# temperature tx compensation
+LUT-BASE
+#----------------------------------------
+# device info
+capabilities
