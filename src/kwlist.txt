@@ -250,3 +250,7 @@ cups_uri
 #----------------------------------------
 # temperature tx compensation
 LUT-BASE
+#----------------------------------------
+# device info
+capabilities
+

@@ -38,7 +38,7 @@ HFILES = $(wildcard ${PLT}/libloragw/inc/*.h)
 SRCS = $(wildcard ${PLT}/libloragw/src/*.c)
 ARTEFACTS = ${LGWLIB} ${LGWINC} $(patsubst %, ${LGWINC}/%, $(notdir ${HFILES}) config.h)
 
-LGW_EXTRA_CFLAGS = -DSTATIONLOG  # Enable station log integration
+LGW_EXTRA_CFLAGS = -DSTATIONLOG -isystem =/usr/include/gps # Enable station log integration
 
 all: platform build
 platform: ${PLT}
