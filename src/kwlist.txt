@@ -46,6 +46,7 @@ freq_range
 gateway_conf
 getxtime
 gps
+gps_enable
 gpstime
 hello
 hwspec

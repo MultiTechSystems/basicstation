@@ -840,7 +840,6 @@ static int deviceGPSSupport () {
         free(jbuf.buf);
         return 0;
     }
-    u1_t ccaDisabled=0, dcDisabled=0, dwellDisabled=0;   // fields not present
     ujcrc_t field;
     u1_t sys_gpsSupported=0;
     uj_enterObject(&D);
