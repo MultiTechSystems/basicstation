@@ -49,6 +49,7 @@ freq_range
 gateway_conf
 getxtime
 gps
+gps_enable
 gpstime
 hello
 hwspec
@@ -253,3 +254,7 @@ cups_uri
 #----------------------------------------
 # temperature tx compensation
 LUT-BASE
+#----------------------------------------
+# device info
+capabilities
+
