@@ -1003,12 +1003,40 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                 resetDC(s2ctx, 50);      // 2%
                 break;
             }
+            case J_AS923:
             case J_AS923JP: { // non-std obsolete naming
                 region = J_AS923_1;
                 region_s = "AS923-1";
                 // FALL THRU
             }
-            case J_AS923_1: { // common region name
+            case J_AS923_1:{ // common region name
+                s2ctx->ccaEnabled = 1;
+                s2ctx->canTx = s2e_canTxPerChnlDC;
+                s2ctx->txpow = 13 * TXPOW_SCALE;
+                resetDC(s2ctx, 10);      // 10%
+                break;
+            }
+            case J_AS923_2: {
+                region = J_AS923_2;
+                region_s = "AS923-2";
+                s2ctx->ccaEnabled = 1;
+                s2ctx->canTx = s2e_canTxPerChnlDC;
+                s2ctx->txpow = 13 * TXPOW_SCALE;
+                resetDC(s2ctx, 10);      // 10%
+                break;
+            }
+            case J_AS923_3: {
+                region = J_AS923_3;
+                region_s = "AS923-3";
+                s2ctx->ccaEnabled = 1;
+                s2ctx->canTx = s2e_canTxPerChnlDC;
+                s2ctx->txpow = 13 * TXPOW_SCALE;
+                resetDC(s2ctx, 10);      // 10%
+                break;
+            }
+            case J_AS923_4: {
+                region = J_AS923_4;
+                region_s = "AS923-4";
                 s2ctx->ccaEnabled = 1;
                 s2ctx->canTx = s2e_canTxPerChnlDC;
                 s2ctx->txpow = 13 * TXPOW_SCALE;
@@ -1791,7 +1819,7 @@ int s2e_onMsg (s2ctx_t* s2ctx, char* json, ujoff_t jsonlen) {
         LOG(MOD_S2E|ERROR, "Parsing of JSON message failed - ignored");
         return 1;   // return fail? would trigger a reconnect
     }
-    if( s2ctx->region == 0 && (msgtype == J_dnmsg || msgtype == J_dnsched || msgtype == J_dnframe) ) {
+    if( s2ctx->txpow == 0 && (msgtype == J_dnmsg || msgtype == J_dnsched || msgtype == J_dnframe) ) {
         // Might happen if messages are still queued
         LOG(MOD_S2E|WARNING, "Received '%.*s' before 'router_config' - dropped", D.str.len, D.str.beg);
         return 1;
