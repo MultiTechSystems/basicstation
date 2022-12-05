@@ -87,8 +87,8 @@ CFG.arm-linux-gnueabihf = linux
 # -- Variant specific
 #  testsim runs libloragw inside master process
 #  testms  uses a master slave model
-CFG.testsim = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw
-CFG.testms  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave
+CFG.testsim = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw nogps
+CFG.testms  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave nogps
 CFG.testfs  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw
 CFG.testpin = logini_lvl=INFO tlsdebug ral_lgw testpin
 CFG.std     = logini_lvl=INFO tlsdebug ral_lgw
