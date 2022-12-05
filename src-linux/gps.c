@@ -40,6 +40,11 @@ int sys_enableGPS () {
     return 0;
 }
 
+int sys_getLatLon (double* lat, double* lon) {
+    LOG(MOD_GPS|ERROR, "GPS function not compiled.");
+    return 0;
+}
+
 #else // ! defined(CFG_nogps)
 
 #include "revision.h"
