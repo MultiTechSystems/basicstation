@@ -53,6 +53,7 @@
 #define MAX_MCU_DRIFT_THRES   _MAX_DT*iPPM_SCALE   // deviation in deci ppm
 #define MAX_PPS_ERROR         1000  // deviation in micros
 #define MAX_PPS_OFFSET_CHANGE  50  // update if more than this
+#define NO_PPS_RESET_THRES     90  // seconds
 #define NO_PPS_ALARM_INI       10  // seconds
 #define NO_PPS_ALARM_RATE     2.0  // growth rate alarm threshold
 #define NO_PPS_ALARM_MAX     3600  // seconds
@@ -165,13 +166,16 @@ static int log_drift_stats (str_t msg, int* drifts, int thresQ, int* auxQ) {
 
 
 ustime_t ts_normalizeTimespanMCU (ustime_t timespan) {
-    
-    
+
+
     return (ustime_t)round(timespan / decodeDriftPPM((double)sum_mcu_drifts / N_DRIFTS));
     return (ustime_t)round( timespan / (1.0 + sum_mcu_drifts / (PPM*iPPM_SCALE) / N_DRIFTS) );
 }
 
 ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
+    static sL_t last_pps_reset = 0;
+
+
     syncQual[syncQual_widx] = quality;
     syncQual_widx = (syncQual_widx + 1) % N_SYNC_QUAL;
     if( syncQual_widx == 0 ) {
@@ -212,9 +216,9 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
     stats->mcu_drifts[stats->mcu_drifts_widx] = drift_ppm;
     stats->mcu_drifts_widx = (stats->mcu_drifts_widx + 1) % N_DRIFTS;
     if( stats->mcu_drifts_widx == 0 ) {
-        
-        
-        
+
+
+
         int thres = log_drift_stats("MCU/SX130X drift stats", stats->mcu_drifts, MCU_DRIFT_THRES, NULL);
         stats->drift_thres = max(MIN_MCU_DRIFT_THRES, min(MAX_MCU_DRIFT_THRES, abs(thres)));
         double mean_ppm = decodePPM( ((double)sum_mcu_drifts) / N_DRIFTS);
@@ -259,6 +263,17 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
     if( curr->xtime - curr->pps_xtime > PPM+TX_MIN_GAP ) {
         LOG(MOD_SYN|XDEBUG, "PPS: Rejecting PPS (xtime/pps_xtime spread): curr->xtime=0x%lX   curr->pps_xtime=0x%lX   diff=%lu (>%u)",
             curr->xtime, curr->pps_xtime, curr->xtime - curr->pps_xtime, PPM+TX_MIN_GAP);
+
+#if defined(CFG_sx1302)
+        // PPS Sync is off more than 90s, reset SX1303 gps once every 5s until recovery
+        if ((curr->xtime - curr->pps_xtime) > NO_PPS_RESET_THRES * 1E6
+            && (curr->xtime < last_pps_reset || (curr->xtime - last_pps_reset) > 5*1E6)) {
+            sx1302_gps_enable(false);
+            sx1302_gps_enable(true);
+            last_pps_reset = curr->xtime;
+        }
+#endif
+
         goto done;  // no PPS since last time sync
     }
     sL_t err = (curr->pps_xtime - last->pps_xtime) % PPM;
@@ -324,7 +339,7 @@ sL_t ts_gpstime2xtime (u1_t txunit, sL_t gpstime) {
             : !gpsOffset ? "GPS" : "?");
         return 0;
     }
-    
+
     if( timesyncs[0].xtime - ppsSync.pps_xtime > PPS_VALID_INTV ) {
         LOG(MOD_SYN|ERROR, "Failed to convert gpstime to xtime - last PPS sync to old: %~T",
             timesyncs[0].xtime - ppsSync.pps_xtime);
