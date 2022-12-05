@@ -31,7 +31,6 @@
 #endif
 
 #include <sys/socket.h>
-#include "revision.h"
 #if defined(CFG_nogps)
 
 #include "rt.h"
@@ -43,6 +42,7 @@ int sys_enableGPS () {
 
 #else // ! defined(CFG_nogps)
 
+#include "revision.h"
 #include "gpsd.h"
 #include "gpsdclient.h"
 
