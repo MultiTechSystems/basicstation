@@ -28,9 +28,9 @@
 
 #if !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
 #include "gpsd_config.h"  /* must be before all includes */
+#include "gpsd.h"
 #endif
 
-#include "gpsd.h"
 #include <sys/socket.h>
 #include "gpsdclient.h"
 #include "revision.h"

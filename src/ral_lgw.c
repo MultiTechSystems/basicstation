@@ -184,8 +184,10 @@ static s2_t       txpowAdjust;    // scaled by TXPOW_SCALE
 static sL_t       last_xtime;
 static tmr_t      rxpollTmr;
 static tmr_t      syncTmr;
-static tmr_t      tempTmr;
 
+#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
+static tmr_t      tempTmr;
+#endif
 
 // ATTR_FASTCODE
 static void synctime (tmr_t* tmr) {
