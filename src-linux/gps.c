@@ -26,13 +26,11 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
+#if !defined(CFG_nogps)
 #include "gpsd_config.h"  /* must be before all includes */
-#include "gpsd.h"
 #endif
 
 #include <sys/socket.h>
-#include "gpsdclient.h"
 #include "revision.h"
 #if defined(CFG_nogps)
 
@@ -44,6 +42,9 @@ int sys_enableGPS () {
 }
 
 #else // ! defined(CFG_nogps)
+
+#include "gpsd.h"
+#include "gpsdclient.h"
 
 #include <unistd.h>
 #include <fcntl.h>
