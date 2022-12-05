@@ -25,7 +25,10 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#if !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
 #include "gpsd_config.h"  /* must be before all includes */
+#endif
 
 #include "gpsd.h"
 #include <sys/socket.h>

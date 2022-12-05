@@ -173,8 +173,9 @@ ustime_t ts_normalizeTimespanMCU (ustime_t timespan) {
 }
 
 ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
+#if defined(CFG_sx1302)
     static sL_t last_pps_reset = 0;
-
+#endif
 
     syncQual[syncQual_widx] = quality;
     syncQual_widx = (syncQual_widx + 1) % N_SYNC_QUAL;

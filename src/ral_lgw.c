@@ -195,10 +195,12 @@ static void synctime (tmr_t* tmr) {
     rt_setTimer(&syncTmr, rt_micros_ahead(delay));
 }
 
+#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
 static void updatetemp(tmr_t tmr) {
     update_temp_comp_value(&sx130xconf.tx_temp_lut);
     rt_setTimer(&tempTmr, rt_micros_ahead(TEMP_COMP_UPDATE));
 }
+#endif
 
 u1_t ral_altAntennas (u1_t txunit) {
     return 0;
