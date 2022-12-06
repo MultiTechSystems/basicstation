@@ -453,6 +453,8 @@ static void gps_read(aio_t* _aio) {
 
     assert(aio == _aio);
     int n, done = 0;
+
+#if defined(CFG_usegpsd)
     fd_set fds;
     struct timespec tv;
 
@@ -461,6 +463,7 @@ static void gps_read(aio_t* _aio) {
     FD_ZERO(&fds);
     FD_SET(gpsdata.gps_fd, &fds);
     time_t exit_timer = 0;
+#endif
 
     while(1) {
 
@@ -576,7 +579,11 @@ static void gps_read(aio_t* _aio) {
 }
 
 
+#if defined(CFG_usegpsd)
 static void gps_pipe_close () {
+#else
+static void gps_close() {
+#endif
     if( aio == NULL )
         return;
 

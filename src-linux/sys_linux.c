@@ -826,7 +826,7 @@ static int parseStationConf () {
     return 1;
 }
 
-
+#if defined(CFG_usegpsd)
 static int deviceGPSSupport () {
     str_t filename = "/var/run/config/device_info.json";
     dbuf_t jbuf = sys_readFile(filename);
@@ -874,6 +874,7 @@ static int deviceGPSSupport () {
     free(jbuf.buf);
     return sys_gpsSupported;
 }
+#endif
 
 
 static struct opts {
