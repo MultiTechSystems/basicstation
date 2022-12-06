@@ -26,20 +26,24 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if !defined(CFG_nogps)
+#if defined(CFG_usegpsd)
 #include "gpsd_config.h"  /* must be before all includes */
-#endif
-
 #include <sys/socket.h>
+#include "revision.h"
+#include "gpsd.h"
+#include "gpsdclient.h"
+
+#endif // CFG_usegpsd
+
 #if defined(CFG_nogps)
 
 #include "rt.h"
 
-int sys_enableGPS () {
+
+int sys_enableGPS (str_t _device) {
     LOG(MOD_GPS|ERROR, "GPS function not compiled.");
     return 0;
 }
-
 int sys_getLatLon (double* lat, double* lon) {
     LOG(MOD_GPS|ERROR, "GPS function not compiled.");
     return 0;
@@ -47,9 +51,6 @@ int sys_getLatLon (double* lat, double* lon) {
 
 #else // ! defined(CFG_nogps)
 
-#include "revision.h"
-#include "gpsd.h"
-#include "gpsdclient.h"
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -109,6 +110,16 @@ static int      last_reported_fix;
 static int      nofix_backoff;
 static ustime_t time_fixchange;
 
+
+
+#if !defined(CFG_usegpsd)
+
+static u1_t   isTTY;
+static int    ubx;
+static int    baud;
+static tio_t saved_tio;
+
+#endif
 
 #if defined(CFG_ubx)
 static u2_t fletcher8 (u1_t* data, int len) {
@@ -424,12 +435,22 @@ static void nmea_gga (char* p) {
 static int gps_reopen ();
 
 static void reopen_timeout (tmr_t* tmr) {
-    if( tmr == NULL || !gps_reopen() )
+    if( tmr == NULL || !gps_reopen() ) {
+#if defined(CFG_usegpsd)
         rt_setTimer(&reopen_tmr, rt_micros_ahead(GPS_REOPEN_TTY_INTV));
+#else
+        rt_setTimer(&reopen_tmr, rt_micros_ahead(isTTY ? GPS_REOPEN_TTY_INTV : GPS_REOPEN_FIFO_INTV));
+#endif
+    }
 }
 
 
+#if defined(CFG_usegpsd)
 static void gps_pipe_read(aio_t* _aio) {
+#else
+static void gps_read(aio_t* _aio) {
+#endif
+
     assert(aio == _aio);
     int n, done = 0;
     fd_set fds;
@@ -442,15 +463,31 @@ static void gps_pipe_read(aio_t* _aio) {
     time_t exit_timer = 0;
 
     while(1) {
+
+
+#if defined(CFG_usegpsd)
         n = pselect(gpsdata.gps_fd+1, &fds, NULL, NULL, &tv, NULL);
         if (n >= 0 && exit_timer && time(NULL) >= exit_timer) {
             LOG(MOD_GPS|XDEBUG, "gpsd pselect timeout expired");
-            // EOF
+             // EOF
             aio_close(aio);
             aio = NULL;
             reopen_timeout(NULL);
             return;
         }
+#else
+        n = read(aio->fd, gpsline+gpsfill, sizeof(gpsline)-gpsfill);
+        if( n == 0 ) {
+             // EOF
+            aio_close(aio);
+            aio = NULL;
+            reopen_timeout(NULL);
+            return;
+        }
+#endif
+
+
+#if defined(CFG_usegpsd)
         if( n == -1 ) {
             if( errno == EAGAIN )
                 return;
@@ -464,6 +501,14 @@ static void gps_pipe_read(aio_t* _aio) {
             reopen_timeout(NULL);
             return;
         }
+#else
+        if( n == -1 ) {
+            if( errno == EAGAIN )
+                return;
+            rt_fatal("Failed to read GPS data from '%s': %s", device, strerror(errno));
+        }
+#endif
+
         gpsfill = n = gpsfill + n;
         for( int i=0; i<n; i++ ) {
             if( gpsline[i] == '\n' ) {
@@ -535,6 +580,17 @@ static void gps_pipe_close () {
     if( aio == NULL )
         return;
 
+#if !defined(CFG_usegpsd)
+    if( isTTY ) {
+        if( tcsetattr(aio->fd, TCSANOW, &saved_tio) == -1 ) {
+            LOG(MOD_GPS|WARNING, "Failed to restore TTY settings for '%s': %s", device, strerror(errno));
+            return;
+        }
+        tcflush(aio->fd, TCIOFLUSH);
+    }
+    isTTY = 0;
+#endif
+
     aio_close(aio);
     aio = NULL;
 }
@@ -549,7 +605,71 @@ static int gps_reopen () {
         aio = NULL;
     }
 
-    garbageCnt = 4;
+#if defined(CFG_usegpsd)
+    if (true) {
+#else
+    if( stat(device, &st) != -1  && (st.st_mode & S_IFMT) == S_IFIFO ) {
+        if( (fd = open(device, O_RDONLY | O_NONBLOCK)) == -1 ) {
+            LOG(MOD_GPS|ERROR, "Failed to open FIFO '%s': %s", device, strerror(errno));
+            return 0;
+        }
+        isTTY = 0;
+        garbageCnt = 0;
+    }
+    else {
+        u4_t pids[1];
+        int n = sys_findPids(device, pids, SIZE_ARRAY(pids));
+        if( n > 0 )
+            rt_fatal("GPS device '%s' in use by process: %d%s", device, pids[0], n>1?".. (and others)":"");
+
+        speed_t speed;
+        switch( baud ) {
+        case   9600: speed =   B9600; break;
+        case  19200: speed =  B19200; break;
+        case  38400: speed =  B38400; break;
+        case  57600: speed =  B57600; break;
+        case 115200: speed = B115200; break;
+        case 230400: speed = B230400; break;
+        default:
+            speed = B9600;
+            break;
+        }
+        if( (fd = open(device, O_RDWR | O_NOCTTY | O_NONBLOCK)) == -1 ) {
+            LOG(MOD_GPS|ERROR, "Failed to open TTY '%s': %s", device, strerror(errno));
+            return 0;
+        }
+        struct termios tio;
+        if( tcgetattr(fd, &tio) == -1 ) {
+            LOG(MOD_GPS|ERROR, "Failed to retrieve TTY settings from '%s': %s", device, strerror(errno));
+            close(fd);
+            return 0;
+        }
+        saved_tio = tio;
+
+        cfsetispeed(&tio, speed);
+        cfsetospeed(&tio, speed);
+
+        tio.c_cflag |= CLOCAL | CREAD | CS8;
+        tio.c_cflag &= ~(PARENB|CSTOPB);
+        tio.c_iflag |= IGNPAR;
+        tio.c_iflag &= ~(ICRNL|IGNCR|IXON|IXOFF);
+        tio.c_oflag  = 0;
+        tio.c_lflag |= ICANON;
+        tio.c_lflag &= ~(ISIG|IEXTEN|ECHO|ECHOE|ECHOK);
+        //tio.c_lflag &= ~(ICANON|ISIG|IEXTEN|ECHO|ECHOE|ECHOK);
+        //tio.c_cc[VMIN]  = 8;
+        //tio.c_cc[VTIME] = 0;
+        if( tcsetattr(fd, TCSANOW, &tio) == -1 ) {
+            LOG(MOD_GPS|ERROR, "Failed to apply TTY settings to '%s': %s", device, strerror(errno));
+            close(fd);
+            return 0;
+        }
+        tcflush(fd, TCIOFLUSH);
+        isTTY = 1;
+
+#endif // ! CFG_usegpsd
+
+        garbageCnt = 4;
 
 #if defined(CFG_ubx)
         if( ubx ) {
@@ -559,6 +679,9 @@ static int gps_reopen () {
         }
 #endif // defined(CFG_ubx)
 
+    }
+
+#if defined(CFG_usegpsd)
     unsigned int flags;
     // flags |= WATCH_RAW;   /*  super-raw data (gps binary)  */
     flags |= WATCH_NMEA; /* raw NMEA */
@@ -578,6 +701,12 @@ static int gps_reopen () {
     atexit(gps_pipe_close);
     gpsfill = 0;
     gps_pipe_read(aio);
+#else
+    aio = aio_open(&device, fd, gps_read, NULL);
+    atexit(gps_close);
+    gpsfill = 0;
+    gps_read(aio);
+#endif
     return 1;
 }
 
@@ -594,10 +723,25 @@ int sys_getLatLon (double* lat, double* lon) {
 // This information is only indicative of having a fix (and how good) and is used to
 // report alarms back to the LNS.
 //
+
+#if !defined(CFG_usegpsd)
+int sys_enableGPS (str_t _device) {
+    if( _device == NULL )
+        return 1;  // no GPS device configured
+    device = _device;
+    baud = 9600;
+    ubx = 1;
+#else
 int sys_enableGPS () {
+#endif
+
     rt_iniTimer(&reopen_tmr, reopen_timeout);
     if( !gps_reopen() ) {
+#if defined(CFG_usegpsd)
         LOG(MOD_GPS|CRITICAL, "Failed to open gpsd connection");
+#else
+        LOG(MOD_GPS|CRITICAL, "Initial open of GPS %s '%s' failed - GPS disabled!", isTTY ? "TTY":"FIFO", device);
+#endif
         return 0;
     }
     dbuf_t b = sys_readFile(lastpos_filename);

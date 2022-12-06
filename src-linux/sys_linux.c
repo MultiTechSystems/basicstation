@@ -73,6 +73,7 @@ static const char* const SLAVE_ENVS[] = {
 #endif // defined(CFG_ral_master_slave)
 
 static struct logfile logfile;
+
 u1_t  gpsEnabled = 0;
 static char* gpsDevice    = NULL;
 static tmr_t startupTmr;
@@ -1078,10 +1079,17 @@ static void startupMaster2 (tmr_t* tmr) {
     rt_addFeature("prod");  // certain development/test/debug features not accepted
 #endif
     sys_enableCmdFIFO(makeFilepath("~/cmd",".fifo",NULL,0));
+#if defined(CFG_usegpsd)
     if( gpsEnabled && deviceGPSSupport()) {
         rt_addFeature("gps");
         sys_enableGPS();
     }
+#else
+    if( gpsDevice ) {
+        rt_addFeature("gps");
+        sys_enableGPS(gpsDevice);
+    }
+#endif
     sys_iniTC();
     sys_startTC();
     sys_iniCUPS();

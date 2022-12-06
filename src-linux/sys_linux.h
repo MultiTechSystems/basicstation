@@ -52,7 +52,11 @@ int      sys_findPids (str_t device, u4_t* pids, int n_pids);
 dbuf_t   sys_checkFile (str_t filename);
 void     sys_writeFile (str_t filename, dbuf_t* data);
 void     sys_startupSlave (int rdfd, int wrfd);
+#if defined(CFG_usegpsd)
 int      sys_enableGPS ();
+#else
+int sys_enableGPS (str_t device);
+#endif
 void     sys_enableCmdFIFO (str_t file);
 
 #endif // _sys_linux_h_
