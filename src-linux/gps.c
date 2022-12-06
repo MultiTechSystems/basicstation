@@ -91,7 +91,6 @@ static u1_t UBX_EN_NAVTIMEGPS[] = {
 
 typedef struct termios tio_t;
 
-static struct gps_data_t gpsdata;
 
 static u1_t   garbageCnt;
 static str_t  device;
@@ -118,6 +117,10 @@ static u1_t   isTTY;
 static int    ubx;
 static int    baud;
 static tio_t saved_tio;
+
+#else
+
+static struct gps_data_t gpsdata;
 
 #endif
 
