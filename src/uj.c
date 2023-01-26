@@ -512,7 +512,7 @@ sL_t uj_int (ujdec_t* dec) {
     ujtype_t t = uj_nextValue(dec);
     if( t != UJ_SNUM && t != UJ_UNUM )
         uj_error(dec,"Expecting an integer value");
-    
+
     return dec->snum;
 }
 
@@ -784,6 +784,12 @@ void uj_encTime(ujbuf_t* b, double val) {
     b->pos += n;
 }
 
+void uj_encFTime(ujbuf_t* b, double val) {
+    anotherValue(b);
+    int n = snprintf(b->buf + b->pos, b->bufsize - b->pos, "%.9f", val);
+    b->pos += n;
+}
+
 void uj_encStr (ujbuf_t* b, const char* s) {
     if( s == NULL ) {
         uj_encNull(b);
@@ -909,18 +915,19 @@ void uj_encKey (ujbuf_t* b, const char* key) {
 
 static int encArg(ujbuf_t* b, int type, va_list* args) {
     switch(type) {
-    case 'b': uj_encBool(b, va_arg(*args,      int)); break;
-    case 'i': uj_encInt (b, va_arg(*args,      int)); break;
-    case 'I': uj_encInt (b, va_arg(*args,     sL_t)); break;
-    case 'u': uj_encUint(b, va_arg(*args, unsigned)); break;
-    case 'U': uj_encUint(b, va_arg(*args,     uL_t)); break;
-    case 'D': uj_encDate(b, va_arg(*args,     uL_t)); break;
-    case 'g': uj_encNum (b, va_arg(*args,   double)); break;
-    case 'T': uj_encTime(b, va_arg(*args,   double)); break;
-    case 's': uj_encStr (b, va_arg(*args,    char*)); break;
-    case 'E': uj_encEui (b, va_arg(*args,     uL_t)); break;
-    case 'M': uj_encMac (b, va_arg(*args,     uL_t)); break;
-    case '6': uj_encId6 (b, va_arg(*args,     uL_t)); break;
+    case 'b': uj_encBool (b, va_arg(*args,      int)); break;
+    case 'i': uj_encInt  (b, va_arg(*args,      int)); break;
+    case 'I': uj_encInt  (b, va_arg(*args,     sL_t)); break;
+    case 'u': uj_encUint (b, va_arg(*args, unsigned)); break;
+    case 'U': uj_encUint (b, va_arg(*args,     uL_t)); break;
+    case 'D': uj_encDate (b, va_arg(*args,     uL_t)); break;
+    case 'g': uj_encNum  (b, va_arg(*args,   double)); break;
+    case 'T': uj_encTime (b, va_arg(*args,   double)); break;
+    case 'F': uj_encFTime(b, va_arg(*args,   double)); break;
+    case 's': uj_encStr  (b, va_arg(*args,    char*)); break;
+    case 'E': uj_encEui  (b, va_arg(*args,     uL_t)); break;
+    case 'M': uj_encMac  (b, va_arg(*args,     uL_t)); break;
+    case '6': uj_encId6  (b, va_arg(*args,     uL_t)); break;
     case 'H': {
         int dl = va_arg(*args, int);
         const u1_t* d = va_arg(*args, const u1_t*);
@@ -1198,8 +1205,8 @@ int vxprintf(ujbuf_t* b, const char* fmt, va_list args) {
             case 'g':
             case 's':
             case 'p': {
-                
-                
+
+
                 char fmt2[MAX_FMT_SIZE+3];
                 memcpy(fmt2, fmt-1, fmtoff+2);
                 if( sizeof(long) == 4 && fmt2[fmtoff] == 'l' ) {

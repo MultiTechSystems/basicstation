@@ -127,6 +127,8 @@ static void rx_polling (tmr_t* tmr) {
             resp.freq   = p->freq_hz;
 #if defined(CFG_sx1302)
             resp.rssi  = (u1_t)-p->rssis;
+            // Set fine timestamp on
+            resp.fts = p->ftime_received ? (u4_t)p->ftime : -1;
 #else
             resp.rssi  = (u1_t)-p->rssi;
 #endif
