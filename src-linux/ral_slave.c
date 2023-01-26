@@ -242,7 +242,11 @@ static void pipe_read (aio_t* aio) {
                 u1_t ret = RAL_TX_OK;
                 if( err == LGW_HAL_SUCCESS ) {
                     ret = RAL_TX_OK;
+#if defined(CFG_sx1302)
+                } else if( err == LGW_LBT_NOT_ALLOWED ) {
+#else
                 } else if( err == LGW_LBT_ISSUE ) {
+#endif
                     ret = RAL_TX_NOCA;
                 } else {
                     LOG(MOD_RAL|ERROR, "lgw_send failed");
