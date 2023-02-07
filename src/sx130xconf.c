@@ -408,6 +408,7 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
                 if( !sx130xconf->ifconf[ifi].enable )
                     continue;
                 if( sx130xconf->lbt.nb_channel < LBT_CHANNEL_FREQ_NB ) {
+                    cfreq = sx130xconf->rfconf[sx130xconf->ifconf[ifi].rf_chain].freq_hz;
                     u4_t freq = cfreq + sx130xconf->ifconf[ifi].freq_hz;
                     sx130xconf->lbt.channels[sx130xconf->lbt.nb_channel].freq_hz = freq;
                     sx130xconf->lbt.nb_channel += 1;
@@ -418,6 +419,9 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
     for( int i=0; i<sx130xconf->lbt.nb_channel; i++ )
         sx130xconf->lbt.channels[i].scan_time_us = scantime_us;
     sx130xconf->lbt.enable = 1;
+
+    dump_lbtConf(sx130xconf);
+
     int e = lgw_lbt_setconf(sx130xconf->lbt);
     if( e != LGW_HAL_SUCCESS ) {
         LOG(MOD_RAL|ERROR, "lgw_lbt_setconf failed: %s", sx130xconf->device);

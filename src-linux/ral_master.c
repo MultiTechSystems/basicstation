@@ -51,7 +51,7 @@
 
 #define WAIT_SLAVE_PID_INTV rt_millis(500)
 #define RETRY_KILL_INTV     rt_millis(100)
-#define RETRY_PIPE_IO       500
+#define RETRY_PIPE_IO       1000
 #define PPM                 1000000
 
 typedef struct slave {
