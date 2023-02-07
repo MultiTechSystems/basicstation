@@ -1020,7 +1020,7 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                 resetDC(s2ctx, 50);      // 2%
                 break;
             }
-            case J_AS923: { // non-std obsolete naming
+            case J_AS923: // non-std obsolete naming
             case J_AS923JP: { // non-std obsolete naming
                 region = J_AS923_1;
                 region_s = "AS923-1";
@@ -1036,6 +1036,7 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             case J_AS923_2: {
                 region = J_AS923_2;
                 region_s = "AS923-2";
+                s2ctx->ccaEnabled = 1;
                 s2ctx->canTx = s2e_canTxPerChnlDC;
                 s2ctx->txpow = 16 * TXPOW_SCALE;
                 resetDC(s2ctx, 10);      // 10%
@@ -1044,6 +1045,7 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             case J_AS923_3: {
                 region = J_AS923_3;
                 region_s = "AS923-3";
+                s2ctx->ccaEnabled = 1;
                 s2ctx->canTx = s2e_canTxPerChnlDC;
                 s2ctx->txpow = 16 * TXPOW_SCALE;
                 resetDC(s2ctx, 10);      // 10%
@@ -1052,6 +1054,7 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             case J_AS923_4: {
                 region = J_AS923_4;
                 region_s = "AS923-4";
+                s2ctx->ccaEnabled = 1;
                 s2ctx->canTx = s2e_canTxPerChnlDC;
                 s2ctx->txpow = 16 * TXPOW_SCALE;
                 resetDC(s2ctx, 10);      // 10%
