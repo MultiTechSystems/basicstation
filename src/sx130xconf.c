@@ -377,8 +377,21 @@ static int find_sx130x_conf (str_t filename, struct sx130xconf* sx130xconf) {
     return 1;
 }
 
-
-
+static void dump_lbtConf (struct sx130xconf* sx130xconf) {
+#if !defined(CFG_sx1302)
+    if( sx130xconf->lbt.enable ) {
+        LOG(MOD_RAL|INFO, "SX130x LBT enabled: rssi_target=%d rssi_offset=%d",
+            sx130xconf->lbt.rssi_target, sx130xconf->lbt.rssi_offset);
+        for( int i=0; i < sx130xconf->lbt.nb_channel; i++ ) {
+            LOG(MOD_RAL|INFO, "  %2d: freq=%F scan=%dus",
+                i, sx130xconf->lbt.channels[i].freq_hz, sx130xconf->lbt.channels[i].scan_time_us);
+        }
+    } else {
+        LOG(MOD_RAL|INFO, "SX130x LBT not enabled");
+    }
+    log_flushIO();
+#endif
+}
 
 static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
 #if !defined(CFG_sx1302) // For now sx1302 does not support CCA
@@ -825,22 +838,6 @@ static void dump_ifConf (int chain, struct lgw_conf_rxrf_s rfconfs[LGW_RF_CHAIN_
             ifconf->datarate);
     }
     log_flushIO();
-}
-
-static void dump_lbtConf (struct sx130xconf* sx130xconf) {
-#if !defined(CFG_sx1302)
-    if( sx130xconf->lbt.enable ) {
-        LOG(MOD_RAL|INFO, "SX130x LBT enabled: rssi_target=%d rssi_offset=%d",
-            sx130xconf->lbt.rssi_target, sx130xconf->lbt.rssi_offset);
-        for( int i=0; i < sx130xconf->lbt.nb_channel; i++ ) {
-            LOG(MOD_RAL|INFO, "  %2d: freq=%F scan=%dus",
-                i, sx130xconf->lbt.channels[i].freq_hz, sx130xconf->lbt.channels[i].scan_time_us);
-        }
-    } else {
-        LOG(MOD_RAL|INFO, "SX130x LBT not enabled");
-    }
-    log_flushIO();
-#endif
 }
 
 
