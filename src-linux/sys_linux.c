@@ -342,7 +342,13 @@ void sys_fatal (int code) {
 }
 
 static char* makePidFilename() {
-    return makeFilepath("~temp/station",".pid",NULL,0);
+    char path[128];
+    getcwd(path, 128);
+
+    if (strstr(path, "lora/1") != NULL)
+        return makeFilepath("~temp/station-ap1",".pid",NULL,0);
+    else
+        return makeFilepath("~temp/station-ap2",".pid",NULL,0);
 }
 
 static int readPid() {
