@@ -383,6 +383,11 @@ static int freq2band (u4_t freq) {
 }
 
 static void update_DC (s2ctx_t* s2ctx, txjob_t* txj) {
+    if (s2e_dcDisabled) {
+        LOG(MOD_S2E|XDEBUG, "DC limits disabled, transmissions regulated by the LNS");
+        return;
+    }
+
     if( s2ctx->region == J_EU868 ) {
         u1_t band = freq2band(txj->freq);
         ustime_t* dcbands = s2ctx->txunits[txj->txunit].dc_eu868bands;
@@ -659,13 +664,6 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
             }
             // Looks like it's on air
             update_DC(s2ctx, curr);
-
-
-
-
-
-
-
 
             curr->txflags |= TXFLAG_TXCHECKED;
             // sending dntxed here instead @txend gives nwks more time to update/inform muxs (join)
@@ -1102,15 +1100,17 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             break;
         }
 #if defined(CFG_prod)
-        case J_nocca:
-        case J_nodc:
-        case J_nodwell:
         case J_device_mode: {
             LOG(MOD_S2E|WARNING, "Feature not supported in production level code (router_config) - ignored: %s", D->field.name);
             uj_skipValue(D);
             break;
         }
 #else // !defined(CFG_prod)
+        case J_device_mode: {
+            sys_deviceMode = uj_bool(D) ? 1 : 0;
+            break;
+        }
+#endif // !defined(CFG_prod)
         case J_nocca: {
             ccaDisabled = uj_bool(D) ? 2 : 1;
             break;
@@ -1123,11 +1123,6 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             dwellDisabled = uj_bool(D) ? 2 : 1;
             break;
         }
-        case J_device_mode: {
-            sys_deviceMode = uj_bool(D) ? 1 : 0;
-            break;
-        }
-#endif // !defined(CFG_prod)
         case J_sx1301_conf:
         case J_SX1301_conf:
         case J_sx1302_conf:

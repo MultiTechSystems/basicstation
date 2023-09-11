@@ -766,15 +766,17 @@ static int parseStationConf () {
                     break;
                 }
 #if defined(CFG_prod)
-                case J_nocca:
-                case J_nodc:
-                case J_nodwell:
                 case J_device_mode: {
                     LOG(MOD_S2E|WARNING, "Feature not supported in production level code (station.conf) - ignored: %s", D.field.name);
                     uj_skipValue(&D);
                     break;
                 }
 #else // !defined(CFG_prod)
+                case J_device_mode: {
+                    sys_deviceMode = uj_bool(&D) ? 1 : 0;
+                    break;
+                }
+#endif // !defined(CFG_prod)
                 case J_nocca: {
                     ccaDisabled = uj_bool(&D) ? 2 : 1;
                     break;
@@ -787,11 +789,7 @@ static int parseStationConf () {
                     dwellDisabled = uj_bool(&D) ? 2 : 1;
                     break;
                 }
-                case J_device_mode: {
-                    sys_deviceMode = uj_bool(&D) ? 1 : 0;
-                    break;
-                }
-#endif // !defined(CFG_prod)
+
                 case J_device: {
                     free((void*)radioDevice);
                     radioDevice = rt_strdup(uj_str(&D));
