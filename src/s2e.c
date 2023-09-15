@@ -402,6 +402,8 @@ static int freq2band (u4_t freq) {
     return DC_BAND_K;
 }
 
+char EU_BAND_NAMES[] = { 'K', 'L', 'M', 'N', 'P', 'Q' };
+
 static void update_DC (s2ctx_t* s2ctx, txjob_t* txj) {
     if (s2e_dcDisabled) {
         LOG(MOD_S2E|XDEBUG, "DC limits disabled, transmissions regulated by the LNS");

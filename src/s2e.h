@@ -66,7 +66,7 @@ enum {
     TXFLAG_CLSA      = 0x04,
     TXFLAG_PING      = 0x08,
     TXFLAG_CLSC      = 0x10,
-    TXFLAG_BCN       = 0x20,  
+    TXFLAG_BCN       = 0x20,
 };
 
 
@@ -90,7 +90,6 @@ N (868.7 MHz - 869.2 MHz):   0.1%
 P (869.4 MHz - 869.65 MHz): 10%
 Q (869.7 MHz - 870 MHz):     1%
 */
-char EU_BAND_NAMES[] = { 'K', 'L', 'M', 'N', 'P', 'Q' };
 
 enum { DC_BAND_K, DC_BAND_L, DC_BAND_M, DC_BAND_N, DC_BAND_P, DC_BAND_Q, DC_NUM_BANDS };
 enum { MAX_DNCHNLS = 48 };
