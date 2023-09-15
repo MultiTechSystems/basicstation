@@ -223,9 +223,12 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
 
 
 static const u2_t DC_EU868BAND_RATE[] = {
-    [DC_DECI ]=   10,
-    [DC_CENTI]=  100,
-    [DC_MILLI]= 1000,
+    [DC_BAND_K]= 1000,
+    [DC_BAND_L]=  100,
+    [DC_BAND_M]=  100,
+    [DC_BAND_N]= 1000,
+    [DC_BAND_P]=   10,
+    [DC_BAND_Q]=  100,
 };
 
 
@@ -374,12 +377,29 @@ static void check_dr (s2ctx_t* s2ctx, ujdec_t* ujd, u1_t* pdr) {
     *pdr = dr;
 }
 
+
+
 static int freq2band (u4_t freq) {
-    if( freq >= 869400000 && freq <= 869650000 )
-        return DC_DECI;
-    if( (freq >= 868000000 && freq <= 868600000) || (freq >= 869700000 && freq <= 870000000) )
-        return DC_CENTI;
-    return DC_MILLI;
+
+    if (freq >= 863000000 && freq <= 865000000 )
+        return DC_BAND_K;
+
+    if (freq >= 865000000 && freq <= 868000000 )
+        return DC_BAND_L;
+
+    if (freq >= 868000000 && freq <= 868600000)
+        return DC_BAND_M;
+
+    if (freq >= 868700000 && freq <= 869200000 )
+        return DC_BAND_N;
+
+    if (freq >= 869400000 && freq <= 869650000 )
+        return DC_BAND_P;
+
+    if (freq >= 869700000 && freq <= 870000000)
+        return DC_BAND_Q;
+
+    return DC_BAND_K;
 }
 
 static void update_DC (s2ctx_t* s2ctx, txjob_t* txj) {
@@ -395,10 +415,11 @@ static void update_DC (s2ctx_t* s2ctx, txjob_t* txj) {
         // Update unless disabled or blocked
         if( t != USTIME_MIN && t != USTIME_MAX ) {
             dcbands[band] = t = txj->txtime + txj->airtime * DC_EU868BAND_RATE[band];
-            LOG(MOD_S2E|XDEBUG, "DC EU band %d blocked until %>.3T (txtime=%>.3T airtime=%~T)",
-                DC_EU868BAND_RATE[band], rt_ustime2utc(t), rt_ustime2utc(txj->txtime), (ustime_t)txj->airtime);
+            LOG(MOD_S2E|XDEBUG, "DC EU band %c (x%d) blocked until %>.3T (txtime=%>.3T airtime=%~T)",
+                EU_BAND_NAMES[band], DC_EU868BAND_RATE[band], rt_ustime2utc(t), rt_ustime2utc(txj->txtime), (ustime_t)txj->airtime);
         }
     }
+
     int dnchnl = txj->dnchnl;
     ustime_t* dclist = s2ctx->txunits[txj->txunit].dc_perChnl;
     ustime_t t = dclist[dnchnl];
