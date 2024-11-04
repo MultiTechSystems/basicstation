@@ -29,7 +29,6 @@
 #if defined(CFG_usegpsd)
 #include "gpsd_config.h"  /* must be before all includes */
 #include <sys/socket.h>
-#include "revision.h"
 #include "gpsd.h"
 #include "gpsdclient.h"
 
