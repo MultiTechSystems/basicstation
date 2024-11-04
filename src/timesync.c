@@ -177,21 +177,6 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
     static sL_t last_pps_reset = 0;
 #endif
 
-    timesync_t* last = &timesyncs[txunit];
-    if( last->ustime == 0 ) {
-        // Very first call - just setup last
-        *last = *curr;
-        return TIMESYNC_RADIO_INTV;
-    }
-
-    sL_t dxc = curr->xtime - last->xtime;
-    if( dxc <= 0 ) {
-        LOG(MOD_SYN|ERROR, "SX130X#%d trigger count not ticking or weird value: 0x%lX .. 0x%lX (dxc=%d)",
-            txunit, last->xtime, curr->xtime, dxc);
-        // This should not occur, radio was reset outside BS or is not working in this state, exit to reset
-        exit(EXIT_FAILURE);
-    }
-
     syncQual[syncQual_widx] = quality;
     syncQual_widx = (syncQual_widx + 1) % N_SYNC_QUAL;
     if( syncQual_widx == 0 ) {
@@ -208,9 +193,19 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
         return TIMESYNC_RADIO_INTV;
     }
 
-
+    timesync_t* last = &timesyncs[txunit];
+    if( last->ustime == 0 ) {
+        // Very first call - just setup last
+        *last = *curr;
+        return TIMESYNC_RADIO_INTV;
+    }
     ustime_t dus = curr->ustime - last->ustime;
-
+    sL_t dxc = curr->xtime - last->xtime;
+    if( dxc <= 0 ) {
+        LOG(MOD_SYN|ERROR, "SX130X#%d trigger count not ticking or weird value: 0x%lX .. 0x%lX (dxc=%d)",
+            txunit, last->xtime, curr->xtime, dxc);
+        return TIMESYNC_RADIO_INTV;
+    }
     if( dus < TIMESYNC_RADIO_INTV/5 ) {
         // Don't consider if measurements too close together
         return TIMESYNC_RADIO_INTV;
@@ -241,6 +236,11 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
         }
         if( stats->excessive_drift_cnt >= 2*QUICK_RETRIES )
             stats->drift_thres = MAX_MCU_DRIFT_THRES;  // reset - we might be stuck on a very low value
+        if( stats->excessive_drift_cnt >= 5*QUICK_RETRIES ) {
+            LOG(MOD_SYN|CRITICAL, "Clock drift could not recover, forcing reset");
+            exit(EXIT_FAILURE);
+        }
+
         return TIMESYNC_RADIO_INTV/2;
     }
     stats->excessive_drift_cnt = 0;
