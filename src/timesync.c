@@ -177,6 +177,13 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
     static sL_t last_pps_reset = 0;
 #endif
 
+    timesync_t* last = &timesyncs[txunit];
+    if( last->ustime == 0 ) {
+        // Very first call - just setup last
+        *last = *curr;
+        return TIMESYNC_RADIO_INTV;
+    }
+
     sL_t dxc = curr->xtime - last->xtime;
     if( dxc <= 0 ) {
         LOG(MOD_SYN|ERROR, "SX130X#%d trigger count not ticking or weird value: 0x%lX .. 0x%lX (dxc=%d)",
@@ -201,12 +208,7 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
         return TIMESYNC_RADIO_INTV;
     }
 
-    timesync_t* last = &timesyncs[txunit];
-    if( last->ustime == 0 ) {
-        // Very first call - just setup last
-        *last = *curr;
-        return TIMESYNC_RADIO_INTV;
-    }
+
     ustime_t dus = curr->ustime - last->ustime;
 
     if( dus < TIMESYNC_RADIO_INTV/5 ) {
