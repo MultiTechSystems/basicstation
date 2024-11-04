@@ -459,7 +459,9 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
         return RAL_TX_FAIL;
     struct ral_tx_req req;
     memset(&req, 0, sizeof(req));
-    req.cmd = nocca ? RAL_CMD_TX_NOCCA : RAL_CMD_TX;
+
+    u1_t  tx_cmd = nocca ? RAL_CMD_TX_NOCCA : RAL_CMD_TX;
+    req.cmd = tx_cmd;
     req.rctx = txjob->rctx;
     req.rps = (s2e_dr2rps(s2ctx, txjob->dr)
                | (txjob->txflags & TXFLAG_BCN ? RPS_BCN : 0));
@@ -471,12 +473,15 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
     memcpy(req.txdata, &s2ctx->txq.txdata[txjob->off], txjob->len);
     if( !write_slave_pipe(slave, &req, sizeof(req)) )
         return RAL_TX_FAIL;
+
     if( region == 0 )
         return RAL_TX_OK;
     struct ral_response resp;
     u1_t buf[PIPE_BUF];
-    if( !read_slave_pipe(slave, buf, PIPE_BUF, RAL_CMD_TX, &resp) )
+
+    if( !read_slave_pipe(slave, buf, PIPE_BUF, tx_cmd, &resp) )
         return TXSTATUS_IDLE;
+
     return resp.status;
 }
 

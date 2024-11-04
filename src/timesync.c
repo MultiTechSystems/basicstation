@@ -177,6 +177,14 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
     static sL_t last_pps_reset = 0;
 #endif
 
+    sL_t dxc = curr->xtime - last->xtime;
+    if( dxc <= 0 ) {
+        LOG(MOD_SYN|ERROR, "SX130X#%d trigger count not ticking or weird value: 0x%lX .. 0x%lX (dxc=%d)",
+            txunit, last->xtime, curr->xtime, dxc);
+        // This should not occur, radio was reset outside BS or is not working in this state, exit to reset
+        exit(EXIT_FAILURE);
+    }
+
     syncQual[syncQual_widx] = quality;
     syncQual_widx = (syncQual_widx + 1) % N_SYNC_QUAL;
     if( syncQual_widx == 0 ) {
@@ -200,12 +208,7 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
         return TIMESYNC_RADIO_INTV;
     }
     ustime_t dus = curr->ustime - last->ustime;
-    sL_t dxc = curr->xtime - last->xtime;
-    if( dxc <= 0 ) {
-        LOG(MOD_SYN|ERROR, "SX130X#%d trigger count not ticking or weird value: 0x%lX .. 0x%lX (dxc=%d)",
-            txunit, last->xtime, curr->xtime, dxc);
-        return TIMESYNC_RADIO_INTV;
-    }
+
     if( dus < TIMESYNC_RADIO_INTV/5 ) {
         // Don't consider if measurements too close together
         return TIMESYNC_RADIO_INTV;
@@ -216,10 +219,8 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
         sum_mcu_drifts += drift_ppm - stats->mcu_drifts[stats->mcu_drifts_widx];
     stats->mcu_drifts[stats->mcu_drifts_widx] = drift_ppm;
     stats->mcu_drifts_widx = (stats->mcu_drifts_widx + 1) % N_DRIFTS;
+
     if( stats->mcu_drifts_widx == 0 ) {
-
-
-
         int thres = log_drift_stats("MCU/SX130X drift stats", stats->mcu_drifts, MCU_DRIFT_THRES, NULL);
         stats->drift_thres = max(MIN_MCU_DRIFT_THRES, min(MAX_MCU_DRIFT_THRES, abs(thres)));
         double mean_ppm = decodePPM( ((double)sum_mcu_drifts) / N_DRIFTS);
@@ -229,6 +230,7 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
             rt_utcOffset_ts = curr->ustime;
         }
     }
+    
     if( abs(drift_ppm) > stats->drift_thres ) {
         stats->excessive_drift_cnt += 1;
         if( (stats->excessive_drift_cnt % QUICK_RETRIES) == 0 ) {
