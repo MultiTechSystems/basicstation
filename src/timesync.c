@@ -54,6 +54,7 @@
 #define MAX_PPS_ERROR         1000  // deviation in micros
 #define MAX_PPS_OFFSET_CHANGE  50  // update if more than this
 #define NO_PPS_RESET_THRES     90  // seconds
+#define NO_PPS_RESET_FAIL_THRES 6  // reset after X resets
 #define NO_PPS_ALARM_INI       10  // seconds
 #define NO_PPS_ALARM_RATE     2.0  // growth rate alarm threshold
 #define NO_PPS_ALARM_MAX     3600  // seconds
@@ -175,6 +176,7 @@ ustime_t ts_normalizeTimespanMCU (ustime_t timespan) {
 ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
 #if defined(CFG_sx1302)
     static sL_t last_pps_reset = 0;
+    static u1_t last_pps_reset_cnt = 0;
 #endif
 
     syncQual[syncQual_widx] = quality;
@@ -276,6 +278,12 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
             sx1302_gps_enable(false);
             sx1302_gps_enable(true);
             last_pps_reset = curr->xtime;
+            last_pps_reset_cnt++;
+        }
+
+        if (last_pps_reset_cnt > NO_PPS_RESET_FAIL_THRES) {
+            LOG(MOD_SYN|CRITICAL, "XTIME/PPS out-of-sync need restart, forcing reset");
+            exit(EXIT_FAILURE);
         }
 #endif
 
@@ -286,7 +294,9 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
     if( err > MAX_PPS_ERROR && err < PPM-MAX_PPS_ERROR ) {
         LOG(MOD_SYN|XDEBUG, "PPS: Rejecting PPS (consecutive pps_xtime error): curr->pps_xtime=0x%lX   last->pps_xtime=0x%lX   diff=%lu",
             curr->pps_xtime, last->pps_xtime, curr->pps_xtime - last->pps_xtime);
+
         goto done;  // out of scope - probably no value latched
+
     }
     if( !ppsSync.pps_xtime )
         LOG(MOD_SYN|INFO, "First PPS pulse acquired");
