@@ -158,6 +158,7 @@
 #define J_tx_notch_freq        ((ujcrc_t)(0xA8FCE052))
 #define J_pwr_idx              ((ujcrc_t)(0xDFD7588B))
 #define J_rssi_tcomp           ((ujcrc_t)(0x47CB0C8F))
+#define J_tx_dwelltime_lbt     ((ujcrc_t)(0xBFDD6EA4))
 #define J_coeff_a              ((ujcrc_t)(0x87785402))
 #define J_coeff_b              ((ujcrc_t)(0x87785401))
 #define J_coeff_c              ((ujcrc_t)(0x87785400))

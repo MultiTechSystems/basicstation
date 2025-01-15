@@ -51,7 +51,7 @@
 
 #define WAIT_SLAVE_PID_INTV rt_millis(500)
 #define RETRY_KILL_INTV     rt_millis(100)
-#define RETRY_PIPE_IO       1000
+#define RETRY_PIPE_IO       80000
 #define PPM                 1000000
 
 typedef struct slave {
@@ -169,6 +169,7 @@ static int read_slave_pipe (slave_t* slave, u1_t* buf, int bufsize, int expcmd, 
                         LOG(MOD_RAL|ERROR, "Unable to map to an up DR: %R", resp->rps);
                     } else {
                         s2e_addRxjob(&TC->s2ctx, rxjob);
+                        rt_usleep(5000);
                         s2e_flushRxjobs(&TC->s2ctx); // XXX
                     }
                 } else {

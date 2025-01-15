@@ -159,6 +159,7 @@ tx_notch_freq
 # sx1302 conf
 pwr_idx
 rssi_tcomp
+tx_dwelltime_lbt
 coeff_a
 coeff_b
 coeff_c

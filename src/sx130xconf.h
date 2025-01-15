@@ -97,6 +97,7 @@ struct sx130xconf {
     struct lgw_conf_rxif_s   ifconf[LGW_IF_CHAIN_NB];
 #if defined(CFG_sx1302)
     struct lgw_conf_ftime_s  ftime; // Fine timestamp structure for SX1302, SX1303.
+    struct lgw_conf_sx1261_s sx1261_cfg;
 #else
     struct lgw_conf_lbt_s    lbt;
 #endif
