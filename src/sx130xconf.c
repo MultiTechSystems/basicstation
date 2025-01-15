@@ -730,7 +730,10 @@ int sx130xconf_parse_setup (struct sx130xconf* sx130xconf, int slaveIdx,
 
     // set non zero defaults
     sx130xconf->boardconf.lorawan_public = 1;
-    sx130xconf->sx1261_cfg.rssi_offset = 25;
+
+#if defined(CFG_sx1302)
+    sx130xconf->sx1261_cfg.rssi_offset = 20;
+#endif
 
     setDevice(sx130xconf, NULL);
 
