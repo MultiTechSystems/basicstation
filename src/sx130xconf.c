@@ -495,24 +495,24 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
     }
 
     if( sx130xconf->sx1261_cfg.lbt_conf.nb_channel == 0 ) {
-        for( int rfi=0; rfi < LGW_RF_CHAIN_NB; rfi++ ) {
-            if( !sx130xconf->rfconf[rfi].enable )
+        u4_t cfreq = 0;
+        int n = max(8,LGW_IF_CHAIN_NB);  
+
+        for( int ifi=0; ifi < n; ifi++ ) {
+            if( !sx130xconf->ifconf[ifi].enable )
                 continue;
-            u4_t cfreq = sx130xconf->rfconf[rfi].freq_hz;
-            int n = max(8,LGW_IF_CHAIN_NB);  
-
-            for( int ifi=0; ifi < n; ifi++ ) {
-                if( !sx130xconf->ifconf[ifi].enable )
+            if( sx130xconf->sx1261_cfg.lbt_conf.nb_channel < LGW_LBT_CHANNEL_NB_MAX ) {
+                cfreq = sx130xconf->rfconf[sx130xconf->ifconf[ifi].rf_chain].freq_hz;
+                if( !sx130xconf->rfconf[sx130xconf->ifconf[ifi].rf_chain].enable )
                     continue;
-                if( sx130xconf->sx1261_cfg.lbt_conf.nb_channel < LGW_LBT_CHANNEL_NB_MAX ) {
-                    u4_t freq = cfreq + sx130xconf->ifconf[ifi].freq_hz;
-                    u1_t bw = sx130xconf->ifconf[ifi].bandwidth;
 
-                    if (bw < BW_500KHZ) {
-                        sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].freq_hz = freq;
-                        sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].bandwidth = bw;
-                        sx130xconf->sx1261_cfg.lbt_conf.nb_channel += 1;
-                    }
+                u4_t freq = cfreq + sx130xconf->ifconf[ifi].freq_hz;
+                u1_t bw = sx130xconf->ifconf[ifi].bandwidth;
+
+                if (bw < BW_500KHZ) {
+                    sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].freq_hz = freq;
+                    sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].bandwidth = bw;
+                    sx130xconf->sx1261_cfg.lbt_conf.nb_channel += 1;
                 }
             }
         }
