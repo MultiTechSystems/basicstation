@@ -106,6 +106,10 @@ int   ral_challoc (chdefl_t* upchs, challoc_cb alloc_cb, void* ctx);
 int ral_rps2bw (rps_t rps);
 int ral_rps2sf (rps_t rps);
 
+#if defined(CFG_sx1302)
+ustime_t ral_calcAirTime(rps_t rps, u1_t plen, u1_t nocrc, u2_t preamble);
+#endif
+
 void  ral_ini ();
 void  ral_stop ();
 int   ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs);

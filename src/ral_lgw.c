@@ -42,6 +42,8 @@
 #include "lgw/loragw_hal.h"
 #if defined(CFG_sx1302)
 #include "lgw/loragw_sx1302_timestamp.h"
+#include "lgw/loragw_aux.h"
+
 extern timestamp_counter_t counter_us; // from loragw_sx1302.c
 #endif // defined(CFG_sx1302)
 
@@ -96,6 +98,12 @@ rps_t ral_lgw2rps (struct lgw_pkt_rx_s* p) {
         ? rps_make(to_sf(p->datarate), to_bw(p->bandwidth))
         : FSK;
 }
+
+#if defined(CFG_sx1302)
+ustime_t ral_calcAirTime(rps_t rps, u1_t plen, u1_t nocrc, u2_t preamble) {
+    return lora_packet_time_on_air(ral_rps2bw(rps), ral_rps2sf(rps), 1 /* 4/5 */, preamble, false, nocrc, plen, NULL, NULL, NULL);
+}
+#endif
 
 
 void ral_rps2lgw (rps_t rps, struct lgw_pkt_tx_s* p) {
