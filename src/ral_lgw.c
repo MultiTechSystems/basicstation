@@ -60,6 +60,10 @@ static const u2_t SF_MAP[] = {
     [SF9  ]= DR_LORA_SF9,
     [SF8  ]= DR_LORA_SF8,
     [SF7  ]= DR_LORA_SF7,
+#if defined(CFG_sx1302)
+    [SF6  ]= DR_LORA_SF6,
+    [SF5  ]= DR_LORA_SF5,
+#endif
     [FSK  ]= DR_UNDEFINED,
     [SFNIL]= DR_UNDEFINED,
 };

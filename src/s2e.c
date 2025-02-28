@@ -239,9 +239,15 @@ static ustime_t _calcAirTime (rps_t rps, u1_t plen, u1_t nocrc, u2_t preamble) {
     // The impl has been taken from lmic.c and adapted
     u1_t bw = rps_bw(rps);  // 0,1,2 = 125,250,500kHz
     u1_t sf = rps_sf(rps);  // 0=FSK, 1..6 = SF7..12
+    u1_t _sf = 0;
+
     if( sf == FSK ) {
         return (plen+/*preamble*/5+/*syncword*/3+/*len*/1+/*crc*/2) * /*bits/byte*/8
             * rt_seconds(1) / /*kbit/s*/50000;
+    }
+    if (sf > SF7) {
+        _sf = sf;
+        sf = SF7;
     }
     sf = 7 + (sf - SF7)*(SF8-SF7); // map enums SF7..SF12 to 7..12
     u1_t sfx = 4*sf;
@@ -273,7 +279,18 @@ static ustime_t _calcAirTime (rps_t rps, u1_t plen, u1_t nocrc, u2_t preamble) {
         div >>= sfx-4;
         sfx = 4;
     }
-    return (((ustime_t)tmp << sfx) * rt_seconds(1) + div/2) / div;
+
+    ustime_t air_time = (((ustime_t)tmp << sfx) * rt_seconds(1) + div/2) / div;
+
+    // SF5/SF6 rough estimate of SF7 / 4 or 2
+    if (_sf == SF6) {
+        air_time = air_time / 2;
+    }
+    if (_sf == SF5) {
+        air_time = air_time / 4;
+    }
+
+    return air_time;
 }
 
 ustime_t s2e_calcDnAirTime (rps_t rps, u1_t plen, u1_t addcrc, u2_t preamble) {

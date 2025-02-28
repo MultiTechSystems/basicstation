@@ -136,6 +136,10 @@ static u4_t airtime (int datarate, int bandwidth, int plen) {
     case DR_LORA_SF9 : sf = SF9 ; break;
     case DR_LORA_SF8 : sf = SF8 ; break;
     case DR_LORA_SF7 : sf = SF7 ; break;
+#if defined(CFG_sx1302)
+    case DR_LORA_SF6 : sf = SF6 ; break;
+    case DR_LORA_SF5 : sf = SF5 ; break;
+#endif
     }
 #elif defined(CFG_lgw2)
     switch(bandwidth) {

@@ -1332,15 +1332,15 @@ int vxprintf(ujbuf_t* b, const char* fmt, va_list args) {
             case 'R': {
                 doff_t beg = b->pos;
                 int rps = va_arg(args, int);
-                if( (rps&7) == 7 || (rps&0x18) == 0x18 ) {
+                if( (rps&0xF) == 9 || (rps&0x18) == 0x18 ) {
                     xputs(b, "SF??", -1);
                 }
-                else if( (rps&7) == 6 ) {
+                else if( (rps&0xF) == 8 ) {
                     xputs(b, "FSK", -1);
                 }
                 else {
-                    u1_t sf = 12-(rps&7);
-                    u2_t bw = 125 * "\x01\x02\x04\x00"[(rps>>3)&3];
+                    u1_t sf = 12-(rps&0xF);
+                    u2_t bw = 125 * "\x01\x02\x04\x00"[(rps>>4)&3];
                     snXp(b, "SF%d/BW%d", sf, bw);
                 }
                 padField(b, beg, width, padding);

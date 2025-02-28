@@ -41,16 +41,16 @@ int  s2e_parse_lora_frame(ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
 void s2e_make_beacon (uint8_t* layout, sL_t epoch_secs, int infodesc, double lat, double lon, uint8_t* buf);
 
 
-enum { SF12, SF11, SF10, SF9, SF8, SF7, FSK, SFNIL };
+enum { SF12, SF11, SF10, SF9, SF8, SF7, SF6, SF5, FSK, SFNIL };
 enum { BW125, BW250, BW500, BWNIL };
-enum { RPS_DNONLY = 0x20 };
-enum { RPS_BCN = 0x40 };
+enum { RPS_DNONLY = 0x40 };
+enum { RPS_BCN = 0x80 };
 enum { RPS_ILLEGAL = 0xFF };
 enum { RPS_FSK = FSK };
 typedef u1_t rps_t;
-inline int   rps_sf   (rps_t params) { return params &  0x7; }
-inline int   rps_bw   (rps_t params) { return (params >> 3) & 0x3; }
-inline rps_t rps_make (int sf, int bw) { return (sf&7) | ((bw&3)<<3); }
+inline int   rps_sf   (rps_t params) { return params &  0xf; }
+inline int   rps_bw   (rps_t params) { return (params >> 4) & 0x3; }
+inline rps_t rps_make (int sf, int bw) { return (sf&0xf) | ((bw&3)<<4); }
 
 // Radio TX states
 enum {
