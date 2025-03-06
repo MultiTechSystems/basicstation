@@ -89,8 +89,8 @@ void selftest_xprintf () {
 
     xprintf(&B, "%R"     ,0);                    TSTR("SF12/BW125");
     xprintf(&B, "%R"     ,8);                    TSTR("FSK");
-    xprintf(&B, "%R"     ,(1<<3)|5);             TSTR("SF7/BW250");
-    xprintf(&B, "%R"     ,(2<<3)|4);             TSTR("SF8/BW500");
+    xprintf(&B, "%R"     ,(1<<4)|5);             TSTR("SF7/BW250");
+    xprintf(&B, "%R"     ,(2<<4)|4);             TSTR("SF8/BW500");
     xprintf(&B, "%^8R"   ,0xFF);                 TSTR("  SF??  ");
     xprintf(&B, "%F"     ,868300000);            TSTR("868.3MHz");
     xprintf(&B, "%~F"    ,868300000);            TSTR("868.3");
