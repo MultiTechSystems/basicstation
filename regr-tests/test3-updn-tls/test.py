@@ -128,7 +128,7 @@ class TestMuxs(tu.Muxs):
             'pdu'    : '0A0B0C0D0E0F',
         }
         # 6..9 not TXed due to DC limits
-        if fcnt <= 5 or fcnt >= 10:
+        if fcnt <= 5 or fcnt == 7  or fcnt == 9 or fcnt >= 10:
             self.exp_seqno.append(dnframe['seqno'])
         await ws.send(json.dumps(dnframe))
 

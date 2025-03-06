@@ -148,7 +148,7 @@ async def test_start():
         logger.warning("Expected file structure not there. Runing prep.sh.")
         prep = await subprocess.create_subprocess_exec("./prep.sh")
         ret = await prep.wait()
-        if ret is not 0:
+        if ret != 0:
             logger.debug("Prep.sh script exited with error code: %d. Stopping", ret)
             os._exit(1)
     sim = TestLgwSimServer(path='shome/spidev')
