@@ -57,7 +57,7 @@ tmux: station prep.done
 	fi
 
 clean:
-	cd shome && (rm -rf tc* station.log station-ap1.pid spidev cups* version.txt sig*)
+	cd shome && (rm -rf tc* station.log station-ap2.pid spidev cups* version.txt sig*)
 	rm -rf ca cups-* tc* upd-sig prep.done
 
 .PHONY: all clean prep tmux emulate sim station

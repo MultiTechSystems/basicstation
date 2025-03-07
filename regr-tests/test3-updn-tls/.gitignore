@@ -5,6 +5,6 @@ tc.trust
 tc-bak.*
 *.info
 station.log
-station.pid
+station-ap2.pid
 radioinit.args
 spidev

@@ -155,7 +155,7 @@ ls -lah
 
 ls ~/temp/
 
-kill -SIGTERM $(cat station-ap1.pid)
+kill -SIGTERM $(cat station-ap2.pid)
 
 sleep 0.5
 
