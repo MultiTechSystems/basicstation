@@ -151,10 +151,6 @@ done
 # for k in `shuf -i 0-$((NREQ-1)) -n $ROUNDS -r`; do echo ${REQLIST[$k]}; done \
 #     | parallel --halt now,fail=1 ncit true
 
-ls -lah
-
-ls ~/temp/
-
 kill -SIGTERM $(cat station-ap2.pid)
 
 sleep 0.5
