@@ -131,11 +131,7 @@ class TestMuxs(tu.Muxs):
             'rctx'    : msg['upinfo']['rctx'],
             'pdu'     : '0A0B0C0D0E0F',
         }
-<<<<<<< HEAD
-        # 6 and 8 not TXed due to DC limits
-=======
         # 6..9 not TXed due to DC limits
->>>>>>> 1d58126... Change test expected fcnt after DC changes
         if fcnt <= 5 or fcnt == 7  or fcnt == 9 or fcnt >= 10:
             self.exp_seqno.append(dnframe['seqno'])
         await ws.send(json.dumps(dnframe))
