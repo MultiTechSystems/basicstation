@@ -33,7 +33,7 @@ function workerPid () {
     #  - All station processes
     #  - the one whose parent pid is not 1
     #  - column 2 is pid
-    local pid=$(cat station.pid)
+    local pid=$(cat station-ap2.pid)
     ps -eo ppid,pid,pgid,command | \
 	grep 'station[ ]' | \
 	grep -P "^ *$pid " | \
@@ -41,8 +41,8 @@ function workerPid () {
 }
 function validatePid () {
     # Make sure all running processes named station and /proc/self/exe (slave procs)
-    # match all processes in process group listed in station.pid
-    local pid=$(cat station.pid)
+    # match all processes in process group listed in station-ap2.pid
+    local pid=$(cat station-ap2.pid)
     cmp <(ps -eo pid,ppid,pgid,command | grep -P "station[ ]|/proc/self/ex[e]") \
 	<(ps -eo pid,ppid,pgid,command | grep "$pid[ ]")
 }
@@ -67,8 +67,8 @@ rm -f station.log
 banner 'Starting first daemon'
 station --temp . -d
 sleep 0.5
-pid=$(cat station.pid)
-echo "Daemon station.pid=$pid"
+pid=$(cat station-ap2.pid)
+echo "Daemon station-ap2.pid=$pid"
 validatePid
 
 collect_gcda _1
@@ -93,7 +93,7 @@ collect_gcda _2
 
 # Force start - kill old daemon
 banner 'Trying to start 3rd daemon with force - kill old one'
-pid=$(cat station.pid)
+pid=$(cat station-ap2.pid)
 echo " - old pid=$pid"
 station --temp . -d -f
 sleep 0.5
@@ -116,7 +116,7 @@ grep "$wpid2 started" station.log || (echo "Missing wpid2: $wpid2 started"; exit
 
 # Kill process group
 banner 'Kill daemon process group'
-([ -f station.pid ] && kill -9 -- -$(cat station.pid)) || true
+([ -f station-ap2.pid ] && kill -9 -- -$(cat station-ap2.pid)) || true
 if (ps -eo pid,ppid,pgid,command | grep "station[ ]"); then
     echo "Kill process group failed"
     exit 1

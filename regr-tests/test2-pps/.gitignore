@@ -3,4 +3,4 @@
 tc-bak.*
 spidev
 station.lastpos
-station.pid
+station-ap2.pid

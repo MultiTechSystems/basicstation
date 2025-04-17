@@ -1,6 +1,6 @@
 tc-bak.*
 station.log
-station.pid
+station-ap2.pid
 update.bin
 tc.uri
 cmd.fifo

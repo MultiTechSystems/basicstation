@@ -53,6 +53,6 @@ tmux: station
 	fi
 
 clean:
-	rm -rf tc-* station.log station.pid spidev
+	rm -rf tc-* station.log station-ap2.pid spidev
 
 .PHONY: all clean

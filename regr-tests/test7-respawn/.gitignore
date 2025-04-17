@@ -1,5 +1,5 @@
 *.info
 tc.uri
 tc-bak*
-station.pid
+station-ap2.pid
 station.log

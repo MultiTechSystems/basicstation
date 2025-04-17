@@ -2,6 +2,6 @@ tc.uri
 tc-bak.*
 station.conf
 station.log
-station.pid
+station-ap2.pid
 spidev*
 *.info

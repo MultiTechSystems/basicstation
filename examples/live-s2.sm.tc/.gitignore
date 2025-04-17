@@ -4,5 +4,5 @@ cups-bak.*
 tc.*
 tc-bak.*
 station.log
-station.pid
+station-ap2.pid
 
