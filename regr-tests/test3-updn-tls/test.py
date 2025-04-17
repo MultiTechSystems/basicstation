@@ -117,7 +117,7 @@ class TestMuxs(tu.Muxs):
         if port >= 3:
             await self.testDone(0 if port == 3 else 1)
         dnframe = {
-            'msgtype': 'dnframe',
+            'msgtype': 'dnmsg',
             'DR'     : msg['DR'],
             'Freq'   : msg['Freq'],
             'DevEui' : '00-00-00-00-11-00-00-01',
