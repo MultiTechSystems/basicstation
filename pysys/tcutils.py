@@ -211,7 +211,7 @@ class ServerABC:
     async def start_server(self):
         self.server = await websockets.serve(self.handle_ws, host='0.0.0.0', port=self.port, **self.tlsctx)
 
-    async def handle_ws(self, ws, path):
+    async def handle_ws(self, ws):
         pass
 
 
@@ -226,8 +226,8 @@ class Infos(ServerABC):
         logger.debug("  Starting INFOS (%s/%s) on Port %d (muxsuri=%s)" %(self.homedir, self.tlsidentity or "", self.port, self.muxsuri))
         await super().start_server()
 
-    async def handle_ws(self, ws, path):
-        logger.debug('. INFOS connect: %s from %r' % (path, ws.remote_address))
+    async def handle_ws(self, ws):
+        logger.debug('. INFOS connect: %s from %r' % (ws.request.path, ws.remote_address))
         try:
             while True:
                 msg = json.loads(await ws.recv())
@@ -266,9 +266,9 @@ class Muxs(ServerABC):
         logger.debug("  Starting MUXS (%s/%s) on Port %d" %(self.homedir, self.tlsidentity or "", self.port))
         await super().start_server()
 
-    async def handle_ws(self, ws, path):
-        logger.debug('. MUXS connect: %s' % (path,))
-        if path != '/router':
+    async def handle_ws(self, ws):
+        logger.debug('. MUXS connect: %s' % (ws.request.path,))
+        if ws.request.path != '/router':
             await ws.close(1020)
         self.ws = ws
         rconf = self.get_router_config()

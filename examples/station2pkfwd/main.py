@@ -74,8 +74,8 @@ class Infos():
     def __str__(self):
         return 'Infos'
 
-    async def accept(self, websocket:WSSP, path:str) -> None:
-        logger.info('%s: accept: path %s' % (self, path))
+    async def accept(self, websocket:WSSP) -> None:
+        logger.info('%s: accept: path %s' % (self, websocket.request.path))
         router = None  # type:Optional[str]
         errmsg = None  # type:Optional[str]
         try:
@@ -125,10 +125,10 @@ class Muxs():
     def __str__(self):
         return 'Muxs'
 
-    async def accept(self, websocket:WSSP, path:str) -> None:
-        logger.info('%s: accept: %s' % (self, path))
+    async def accept(self, websocket:WSSP) -> None:
+        logger.info('%s: accept: %s' % (self, websocket.request.path))
         try:
-            s = path[1:]
+            s = websocket.request.path[1:]
             routerid = Id6(s, 'router')
             if routerid not in routerid2router:
                 await websocket_send_error(websocket, s, 'Router not provisioned')
