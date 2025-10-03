@@ -117,15 +117,19 @@ class TestMuxs(tu.Muxs):
         if port >= 3:
             await self.testDone(0 if port == 3 else 1)
         dnframe = {
-            'msgtype': 'dnmsg',
-            'DR'     : msg['DR'],
-            'Freq'   : msg['Freq'],
-            'DevEui' : '00-00-00-00-11-00-00-01',
-            'xtime'  : msg['upinfo']['xtime']+1000000,
-            'seqno'  : fcnt,
-            'MuxTime': time.time(),
-            'rctx'   : msg['upinfo']['rctx'],
-            'pdu'    : '0A0B0C0D0E0F',
+            'msgtype' : 'dnmsg',
+            'dC'      : 0,
+            'dnmode'  : 'updn',
+            'priority': 0,
+            'RxDelay' : 0,
+            'RX1DR'   : msg['DR'],
+            'RX1Freq' : msg['Freq'],
+            'DevEui'  : '00-00-00-00-11-00-00-01',
+            'xtime'   : msg['upinfo']['xtime']+1000000,
+            'seqno'   : fcnt,
+            'MuxTime' : time.time(),
+            'rctx'    : msg['upinfo']['rctx'],
+            'pdu'     : '0A0B0C0D0E0F',
         }
         # 6..9 not TXed due to DC limits
         if fcnt <= 5 or fcnt == 7  or fcnt == 9 or fcnt >= 10:
