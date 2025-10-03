@@ -74,13 +74,18 @@ validatePid
 collect_gcda _1
 
 
-# MTS allows multiple daemons on MTCDT with two cards for reporting to separate LNS
-#     # No error, skip test
 # No other station running - start new daemon
-# banner 'Trying to start 2nd daemon (no force)'
-# if station --temp . -d; then
-#
-# fi
+banner 'Trying to start 2nd daemon (no force)'
+if station --temp . -d; then
+    echo "ERROR: Should not succeed starting another daemon"
+    exit 1
+else
+    xcode=$?
+    if [[ $xcode -ne 6 ]]; then
+	echo "ERROR: Wrong exit code: $xcode"
+	exit 1
+    fi
+fi
 
 wpid=$(workerPid)
 grep "$wpid started" station.log || (echo "Missing wpid: $wpid started"; exit 1)
