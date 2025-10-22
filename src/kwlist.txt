@@ -55,6 +55,7 @@ hello
 hwspec
 if
 IL915
+IN865
 infos_uri
 JoinEui
 JoinEUI

@@ -58,6 +58,7 @@
 #define J_hwspec               ((ujcrc_t)(0xE3C2202A))
 #define J_if                   ((ujcrc_t)(0x0000690F))
 #define J_IL915                ((ujcrc_t)(0xE1689771))
+#define J_IN865                ((ujcrc_t)(0xE3619875))
 #define J_infos_uri            ((ujcrc_t)(0xE3215635))
 #define J_JoinEui              ((ujcrc_t)(0x5B616676))
 #define J_JoinEUI              ((ujcrc_t)(0x5B618676))

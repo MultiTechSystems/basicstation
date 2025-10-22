@@ -1025,6 +1025,10 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                 resetDC(s2ctx, 3600/100);  // 100s / 1h cummulative on time under PSA = ~2.78%
                 break;
             }
+            case J_IN865: {
+                s2ctx->txpow = 30 * TXPOW_SCALE;
+                break;
+            }
             case J_IL915: {
                 s2ctx->txpow  = 14 * TXPOW_SCALE;
                 s2ctx->txpow2 = 20 * TXPOW_SCALE;
