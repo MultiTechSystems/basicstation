@@ -26,9 +26,16 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "mbedtls/version.h"
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
 #include "mbedtls/net_sockets.h"
+#else
+#include "mbedtls/net.h"
+#endif
 #include "mbedtls/ssl.h"
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
 #include "mbedtls/certs.h"
+#endif
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/error.h"
@@ -230,7 +237,11 @@ int tls_setMyCert (tlsconf_t* conf, const char* cert, int certlen, const char* k
         keyb = (u1_t*)dbuf.buf;
         keyl = dbuf.bufsize+1;
     }
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    if( (ret = mbedtls_pk_parse_key(mykey, keyb, keyl, (const u1_t*)pwd, pwd?strlen(pwd):0, NULL, NULL)) != 0 ) {
+#else
     if( (ret = mbedtls_pk_parse_key(mykey, keyb, keyl, (const u1_t*)pwd, pwd?strlen(pwd):0)) != 0 ) {
+#endif
         log_mbedError(ERROR, ret, "Parsing key");
         goto errexit;
     }
