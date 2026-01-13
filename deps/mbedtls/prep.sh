@@ -42,8 +42,13 @@ fi
 if [[ ! -d git-repo ]] || [[ "$(cd git-repo && git describe --tags 2>/dev/null || echo '')" != *"${MBEDTLS_VERSION}"* ]]; then
     rm -rf git-repo platform-*
     echo "Cloning mbedtls ${MBEDTLS_VERSION} (branch: ${MBEDTLS_BRANCH})..."
-    # mbedtls 3.x requires submodules (framework)
-    git clone -b "${MBEDTLS_BRANCH}" --single-branch --depth 1 --recurse-submodules https://github.com/Mbed-TLS/mbedtls.git git-repo
+    # mbedtls 3.x requires submodules (framework) - shallow clone doesn't work well with submodules
+    if [[ "${MBEDTLS_VERSION}" == 3.* ]]; then
+        git clone -b "${MBEDTLS_BRANCH}" --single-branch https://github.com/Mbed-TLS/mbedtls.git git-repo
+        (cd git-repo && git submodule update --init --recursive)
+    else
+        git clone -b "${MBEDTLS_BRANCH}" --single-branch --depth 1 https://github.com/Mbed-TLS/mbedtls.git git-repo
+    fi
 fi
 
 if [[ -z "$platform" ]] || [[ -z "$variant" ]]; then
@@ -53,7 +58,7 @@ if [[ -z "$platform" ]] || [[ -z "$variant" ]]; then
 fi
 
 if [[ ! -d platform-$platform ]]; then
-    git clone --recurse-submodules git-repo platform-$platform
+    cp -a git-repo platform-$platform
 fi
 
 cd platform-$platform
