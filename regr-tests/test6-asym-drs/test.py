@@ -59,8 +59,19 @@ class TestLgwSimServer(su.LgwSimServer):
     updf_task = None
     txcnt = 0
     last_tx_dr = None
+    muxs_ready = False  # Set when muxs receives router_config
+    first_connection = True
 
     async def on_connected(self, lgwsim:su.LgwSim) -> None:
+        # Reset fcnt on reconnection (testms may restart slave)
+        if not self.first_connection:
+            logger.debug('LGWSIM reconnected, resetting fcnt')
+            self.fcnt = 0
+        self.first_connection = False
+        
+        # Wait for muxs to be configured before sending uplinks
+        while not self.muxs_ready:
+            await asyncio.sleep(0.1)
         self.updf_task = asyncio.ensure_future(self.send_updf())
 
     async def on_close(self):
@@ -97,7 +108,7 @@ class TestLgwSimServer(su.LgwSimServer):
                     await lgwsim.send_rx(rps=(7, 125), freq=902.3, frame=su.makeDF(fcnt=self.fcnt, port=3))
                 
                 self.fcnt += 1
-                await asyncio.sleep(2.0)
+                await asyncio.sleep(2.5)  # Match test3-updn-tls timing for testms compatibility
         except asyncio.CancelledError:
             logger.debug('send_updf canceled.')
         except Exception as exc:
@@ -107,11 +118,19 @@ class TestLgwSimServer(su.LgwSimServer):
 class TestMuxs(tu.Muxs):
     exp_seqno = []
     received_updf = []
+    sim_server = None  # Reference to sim server for signaling
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Use asymmetric DR config (sx1301 version for testsim)
         self.router_config = tu.router_config_US902_8ch_RP2_sx1301
+
+    async def handle_connection(self, ws):
+        # Signal sim that muxs is ready before processing messages
+        if self.sim_server:
+            logger.debug('Muxs ready, signaling sim')
+            self.sim_server.muxs_ready = True
+        await super().handle_connection(ws)
 
     async def testDone(self, status):
         global station
@@ -178,6 +197,9 @@ async def test_start():
     infos = tu.Infos(muxsuri='ws://localhost:6039/router')
     muxs = TestMuxs()
     sim = TestLgwSimServer()
+    
+    # Connect muxs and sim for ready signaling
+    muxs.sim_server = sim
 
     await infos.start_server()
     await muxs.start_server()
