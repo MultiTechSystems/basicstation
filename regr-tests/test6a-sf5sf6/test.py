@@ -125,7 +125,8 @@ class TestMuxs(tu.Muxs):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Use asymmetric DR config with SF5/SF6 support
-        self.router_config = tu.router_config_US902_8ch_RP2
+        # testsim1302 still uses lgw1 HAL, so use sx1301 config
+        self.router_config = tu.router_config_US902_8ch_RP2_sx1301
 
     async def testDone(self, status):
         global station, sim
@@ -182,16 +183,10 @@ class TestMuxs(tu.Muxs):
             return
         
         # Send downlink response
-        # For RP2 1.0.5 US915, test various downlink DRs including SF5/SF6
-        if fcnt == 0:
-            # Response with DR14 = SF6/500kHz
-            dn_dr = 14
-        elif fcnt == 1:
-            # Response with DR0 = SF5/500kHz (new in RP2 1.0.5)
-            dn_dr = 0
-        else:
-            # Normal DR8 = SF12/500kHz
-            dn_dr = 8
+        # For testsim1302 (lgw1-based), use standard DRs that SX1301 HAL supports
+        # SF5/SF6 TX not supported on simulated SX1301 hardware
+        # DR8 = SF12/500kHz is the standard US915 downlink
+        dn_dr = 8
             
         dnframe = {
             'msgtype' : 'dnmsg',
