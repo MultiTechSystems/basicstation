@@ -305,7 +305,7 @@ router_config_US902_8ch_RP2_sx1301 = {
                    [903700000, 0, 4]]
 }
 
-# AU915 with RP2 1.0.5 asymmetric datarates (SF5/SF6 support)
+# AU915 with RP2 1.0.5 asymmetric datarates (SF5/SF6 support) - SX1302 version
 router_config_AU915_8ch_RP2 = {
     **base_regions['AU915_RP2_1_0_5'],
     'JoinEui': None,
@@ -333,6 +333,37 @@ router_config_AU915_8ch_RP2 = {
                    [917200000, 0, 10],
                    [917400000, 0, 10],
                    [917600000, 0, 10]]
+}
+
+# AU915 with RP2 1.0.5 asymmetric datarates - SX1301 version for testsim
+# Note: SF5/SF6 uplinks not supported on SX1301, but asymmetric DR tables work
+router_config_AU915_8ch_RP2_sx1301 = {
+    **base_regions['AU915_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 916800000},
+                     'radio_1': {'enable': True, 'freq': 917400000}}],
+    'upchannels': [[916200000, 0, 6],   # DR0-6 for SX1301 (SF12-SF7 + SF8/500)
+                   [916400000, 0, 6],
+                   [916600000, 0, 6],
+                   [916800000, 0, 6],
+                   [917000000, 0, 6],
+                   [917200000, 0, 6],
+                   [917400000, 0, 6],
+                   [917600000, 0, 6]]
 }
 
 router_config_KR920 = {

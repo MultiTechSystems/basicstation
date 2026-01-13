@@ -34,7 +34,7 @@ X=$(echo -e "\033[0m")
 cd $(dirname $0)
 
 mkdir -p t.log
-variants="testsim testsim1302 testms"
+variants="testsim testsim1302 testms testms1302"
 tests="$(echo test[0-9]*-*)"
 
 verbose=0
