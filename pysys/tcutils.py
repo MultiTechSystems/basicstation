@@ -91,6 +91,48 @@ base_regions = {
         'max_eirp': 30.0,
         'protocol': 1,
         'freq_range': [902000000, 928000000]
+    },
+    # US902 RP2 1.0.5 with asymmetric uplink/downlink datarates
+    "US902_RP2_1_0_5": {
+        'msgtype': 'router_config',
+        'region': 'US915',
+        'DRs_up': [
+            (10, 125, 0),   # DR0 - SF10/125kHz
+            (9, 125, 0),    # DR1 - SF9/125kHz
+            (8, 125, 0),    # DR2 - SF8/125kHz
+            (7, 125, 0),    # DR3 - SF7/125kHz
+            (8, 500, 0),    # DR4 - SF8/500kHz
+            (-2, 0, 0),     # DR5 - LR-FHSS (not supported)
+            (-2, 0, 0),     # DR6 - LR-FHSS (not supported)
+            (6, 125, 0),    # DR7 - SF6/125kHz (new in RP2 1.0.5)
+            (5, 125, 0),    # DR8 - SF5/125kHz (new in RP2 1.0.5)
+            (-1, 0, 0),     # DR9-14 RFU
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0)],    # DR15 - defined in TS001
+        'DRs_dn': [
+            (5, 500, 0),    # DR0 - SF5/500kHz (new in RP2 1.0.5)
+            (-1, 0, 0),     # DR1-7 RFU
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (12, 500, 0),   # DR8 - SF12/500kHz
+            (11, 500, 0),   # DR9 - SF11/500kHz
+            (10, 500, 0),   # DR10 - SF10/500kHz
+            (9, 500, 0),    # DR11 - SF9/500kHz
+            (8, 500, 0),    # DR12 - SF8/500kHz
+            (7, 500, 0),    # DR13 - SF7/500kHz
+            (6, 500, 0),    # DR14 - SF6/500kHz (new in RP2 1.0.5)
+            (-1, 0, 0)],    # DR15 - defined in TS001
+        'max_eirp': 30.0,
+        'protocol': 1,
+        'freq_range': [902000000, 928000000]
     }
 }
 base_regions["KR920"] = {
@@ -159,6 +201,35 @@ router_config_US902_8ch = {
                    [903700000, 0, 5]]
 }
 
+# US902 with RP2 1.0.5 asymmetric datarates (SF5/SF6 support)
+router_config_US902_8ch_RP2 = {
+    **base_regions['US902_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1302/1',  # SX1302 required for SF5/SF6
+    'sx1302_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 902700000},
+                     'radio_1': {'enable': True, 'freq': 903300000}}],
+    'upchannels': [[902300000, 0, 8],   # DR0-8 (SF5/SF6 now valid for uplink)
+                   [902500000, 0, 8],
+                   [902700000, 0, 8],
+                   [902900000, 0, 8],
+                   [903100000, 0, 8],
+                   [903300000, 0, 8],
+                   [903500000, 0, 8],
+                   [903700000, 0, 8]]
+}
 
 router_config_KR920 = {
     **base_regions['KR920'],
