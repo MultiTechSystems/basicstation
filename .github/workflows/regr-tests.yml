@@ -16,7 +16,8 @@ jobs:
           sudo apt-get install -y python3.11 python3-pip virtualenv psmisc git build-essential lcov curl netcat-openbsd
           virtualenv --python python3.11 pyenv
           . pyenv/bin/activate
-          pip3 install setuptools aiohttp websockets
+          # jsonschema and jinja2 required for mbedtls 3.x build scripts
+          pip3 install setuptools aiohttp websockets jsonschema jinja2
       - name: Execute Tests
         env:
           MBEDTLS_VERSION: ${{ matrix.mbedtls-version }}
