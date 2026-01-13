@@ -41,6 +41,17 @@
 #include "lgw/loragw_hal.h"
 #include "lgw/loragw_fpga.h"
 #include "lgw/loragw_lbt.h"
+// Define SF5/SF6 datarate values for simulation
+// CFG_sf5sf6 enables SF5/SF6 in simulation without full SX1302 HAL
+// CFG_sx1302 also enables SF5/SF6 when using real SX1302 HAL
+#if defined(CFG_sx1302) || defined(CFG_sf5sf6)
+#ifndef DR_LORA_SF5
+#define DR_LORA_SF5     0x05
+#endif
+#ifndef DR_LORA_SF6
+#define DR_LORA_SF6     0x06
+#endif
+#endif
 #elif defined(CFG_lgw2)
 #include "lgw2/sx1301ar_hal.h"
 #include "lgw2/sx1301ar_err.h"
@@ -136,7 +147,7 @@ static u4_t airtime (int datarate, int bandwidth, int plen) {
     case DR_LORA_SF9 : sf = SF9 ; break;
     case DR_LORA_SF8 : sf = SF8 ; break;
     case DR_LORA_SF7 : sf = SF7 ; break;
-#if defined(CFG_sx1302)
+#if defined(CFG_sx1302) || defined(CFG_sf5sf6)
     case DR_LORA_SF6 : sf = SF6 ; break;
     case DR_LORA_SF5 : sf = SF5 ; break;
 #endif

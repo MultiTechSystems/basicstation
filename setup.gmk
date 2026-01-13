@@ -87,7 +87,9 @@ CFG.arm-linux-gnueabihf = linux
 # -- Variant specific
 #  testsim runs libloragw inside master process
 #  testms  uses a master slave model
+#  testsim1302 - testsim with SF5/SF6 support (simulated SX1302/SX1303)
 CFG.testsim = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw
+CFG.testsim1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw sf5sf6
 CFG.testms  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave
 CFG.testfs  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw
 CFG.testpin = logini_lvl=INFO tlsdebug ral_lgw testpin
@@ -132,6 +134,7 @@ CFLAGS.linuxpico.debug = -g -O0
 CFLAGS.corecell.debug = -g -O0
 CFLAGS.linuxpico.debugn = -g -O0
 CFLAGS.linux.testsim  = -g -O0 --coverage
+CFLAGS.linux.testsim1302 = -g -O0 --coverage
 CFLAGS.linux.testms   = -g -O0 --coverage
 CFLAGS.linux.testfs   = -g -O0 --coverage
 CFLAGS.linux.testpin  = -g -O3
