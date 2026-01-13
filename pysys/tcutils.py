@@ -244,7 +244,7 @@ router_config_US902_8ch = {
                    [903700000, 0, 5]]
 }
 
-# US902 with RP2 1.0.5 asymmetric datarates (SF5/SF6 support)
+# US902 with RP2 1.0.5 asymmetric datarates (SF5/SF6 support) - SX1302 version
 router_config_US902_8ch_RP2 = {
     **base_regions['US902_RP2_1_0_5'],
     'JoinEui': None,
@@ -272,6 +272,37 @@ router_config_US902_8ch_RP2 = {
                    [903300000, 0, 8],
                    [903500000, 0, 8],
                    [903700000, 0, 8]]
+}
+
+# US902 with RP2 1.0.5 asymmetric datarates - SX1301 version for testsim
+# Note: SF5/SF6 uplinks not supported on SX1301, but asymmetric DR tables work
+router_config_US902_8ch_RP2_sx1301 = {
+    **base_regions['US902_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 902700000},
+                     'radio_1': {'enable': True, 'freq': 903300000}}],
+    'upchannels': [[902300000, 0, 4],   # DR0-4 for SX1301 (SF10-SF7 + SF8/500)
+                   [902500000, 0, 4],
+                   [902700000, 0, 4],
+                   [902900000, 0, 4],
+                   [903100000, 0, 4],
+                   [903300000, 0, 4],
+                   [903500000, 0, 4],
+                   [903700000, 0, 4]]
 }
 
 # AU915 with RP2 1.0.5 asymmetric datarates (SF5/SF6 support)
