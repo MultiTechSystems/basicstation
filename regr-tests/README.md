@@ -30,6 +30,7 @@ Tests are run against multiple build variants:
 | `testsim` | Simulated SX1301 gateway (libloragw in master process) |
 | `testsim1302` | Simulated SX1302/SX1303 with SF5/SF6 support |
 | `testms` | Master/slave model simulation |
+| `testms1302` | Master/slave with SF5/SF6 support |
 
 ### Building Variants
 
@@ -42,6 +43,9 @@ make platform=linux variant=testsim1302
 
 # Build testms variant
 make platform=linux variant=testms
+
+# Build testms1302 variant (master/slave with SF5/SF6)
+make platform=linux variant=testms1302
 ```
 
 ## Test Structure
@@ -90,10 +94,23 @@ Each test is in a directory named `test<N>-<name>/` containing:
 
 ### RP2 1.0.5 Tests
 
-| Test | Description | Variant |
-|------|-------------|---------|
-| `test6-asym-drs` | Asymmetric DR support (US915/AU915) | testsim |
-| `test6a-sf5sf6-hw` | SF5/SF6 spreading factors | testsim1302 only |
+These tests verify LoRaWAN Regional Parameters 2 1.0.5 support:
+
+| Test | Description | Variants |
+|------|-------------|----------|
+| `test6-asym-drs` | US915 asymmetric DR support (DRs_up/DRs_dn) | all |
+| `test6a-sf5sf6` | US915 SF5/SF6 uplinks (DR7/DR8) | testsim1302, testms1302 |
+| `test6b-au915-asym-drs` | AU915 asymmetric DR support | all |
+| `test6c-au915-sf5sf6` | AU915 SF5/SF6 uplinks (DR9/DR10) | testsim1302, testms1302 |
+| `test6d-eu868-sf5sf6` | EU868 SF5/SF6 uplinks (DR12/DR13) | testsim1302, testms1302 |
+
+#### Regional SF5/SF6 DR Mapping (RP2 1.0.5)
+
+| Region | SF6 Uplink | SF5 Uplink | Downlink | Notes |
+|--------|------------|------------|----------|-------|
+| US915 | DR7 | DR8 | DR0=SF5/500, DR14=SF6/500 | Asymmetric up/down |
+| AU915 | DR9 | DR10 | DR0=SF5/500, DR14=SF6/500 | Asymmetric up/down |
+| EU868 | DR12 | DR13 | Same as uplink | Symmetric |
 
 ### Other Tests
 
@@ -187,13 +204,24 @@ Located in `../pysys/`:
 
 Available in `tcutils.py`:
 
+#### Legacy Configs
 | Config | Description |
 |--------|-------------|
-| `router_config_EU863` | EU868 8-channel |
-| `router_config_US902_8ch` | US915 8-channel (legacy) |
-| `router_config_US902_8ch_RP2` | US915 8-channel RP2 1.0.5 (SX1302) |
-| `router_config_US902_8ch_RP2_sx1301` | US915 8-channel RP2 1.0.5 (SX1301 sim) |
-| `router_config_AU915_8ch_RP2` | AU915 8-channel RP2 1.0.5 |
+| `router_config_EU863_6ch` | EU868 6-channel |
+| `router_config_US902_8ch` | US915 8-channel |
+| `router_config_KR920` | KR920 |
+
+#### RP2 1.0.5 Configs (Asymmetric DRs)
+| Config | Description |
+|--------|-------------|
+| `router_config_US902_8ch_RP2` | US915 RP2 1.0.5 (SX1302, DR0-8 upchannels) |
+| `router_config_US902_8ch_RP2_sx1301` | US915 RP2 1.0.5 (SX1301, DR0-4 upchannels) |
+| `router_config_US902_8ch_RP2_sf5sf6` | US915 RP2 1.0.5 for SF5/SF6 testing (DR0-8) |
+| `router_config_AU915_8ch_RP2` | AU915 RP2 1.0.5 (SX1302, DR0-10 upchannels) |
+| `router_config_AU915_8ch_RP2_sx1301` | AU915 RP2 1.0.5 (SX1301, DR0-6 upchannels) |
+| `router_config_AU915_8ch_RP2_sf5sf6` | AU915 RP2 1.0.5 for SF5/SF6 testing (DR0-10) |
+| `router_config_EU868_6ch_RP2_sx1301` | EU868 RP2 1.0.5 (SX1301, DR0-5 upchannels) |
+| `router_config_EU868_6ch_RP2_sf5sf6` | EU868 RP2 1.0.5 for SF5/SF6 testing (DR0-13) |
 
 ## Example Configurations
 
