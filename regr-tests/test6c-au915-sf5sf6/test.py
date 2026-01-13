@@ -25,14 +25,14 @@
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """
-Test US915 SF5/SF6 support with SX1302/SX1303 (testsim1302 variant).
+Test AU915 SF5/SF6 support with SX1302/SX1303 (testsim1302 variant).
 
-This test verifies RP2 1.0.5 US915 datarates:
-- Uplink: DR7 (SF6/125kHz), DR8 (SF5/125kHz)
+This test verifies RP2 1.0.5 AU915 datarates:
+- Uplink: DR9 (SF6/125kHz), DR10 (SF5/125kHz)
 - Downlink: DR0 (SF5/500kHz), DR14 (SF6/500kHz)
 
-US915 RP2 1.0.5 DR tables:
-  Uplink:  DR0=SF10/125, DR7=SF6/125, DR8=SF5/125
+AU915 RP2 1.0.5 DR tables:
+  Uplink:  DR0=SF12/125, DR9=SF6/125, DR10=SF5/125
   Downlink: DR0=SF5/500, DR8=SF12/500, DR14=SF6/500
 """
 
@@ -44,7 +44,7 @@ import asyncio
 from asyncio import subprocess
 
 import logging
-logger = logging.getLogger('test6a-sf5sf6')
+logger = logging.getLogger('test6c-au915-sf5sf6')
 
 import tcutils as tu
 import simutils as su
@@ -97,22 +97,22 @@ class TestLgwSimServer(su.LgwSimServer):
                     return
                 lgwsim = self.units[0]
                 
-                # Test US915 RP2 1.0.5 uplinks
+                # Test AU915 RP2 1.0.5 uplinks
                 if self.fcnt == 0:
-                    # DR7 uplink = SF6/125kHz
-                    logger.info('Sending SF6/125kHz uplink (US915 DR7)')
-                    await lgwsim.send_rx(rps=(6, 125), freq=902.3, frame=su.makeDF(fcnt=self.fcnt, port=1))
+                    # DR9 uplink = SF6/125kHz (AU915 specific)
+                    logger.info('Sending SF6/125kHz uplink (AU915 DR9)')
+                    await lgwsim.send_rx(rps=(6, 125), freq=916.2, frame=su.makeDF(fcnt=self.fcnt, port=1))
                 elif self.fcnt == 1:
-                    # DR8 uplink = SF5/125kHz
-                    logger.info('Sending SF5/125kHz uplink (US915 DR8)')
-                    await lgwsim.send_rx(rps=(5, 125), freq=902.5, frame=su.makeDF(fcnt=self.fcnt, port=1))
+                    # DR10 uplink = SF5/125kHz (AU915 specific)
+                    logger.info('Sending SF5/125kHz uplink (AU915 DR10)')
+                    await lgwsim.send_rx(rps=(5, 125), freq=916.4, frame=su.makeDF(fcnt=self.fcnt, port=1))
                 elif self.fcnt == 2:
-                    # Standard DR3 uplink = SF7/125kHz for comparison
-                    logger.info('Sending SF7/125kHz uplink (US915 DR3)')
-                    await lgwsim.send_rx(rps=(7, 125), freq=902.7, frame=su.makeDF(fcnt=self.fcnt, port=1))
+                    # Standard DR5 uplink = SF7/125kHz for comparison
+                    logger.info('Sending SF7/125kHz uplink (AU915 DR5)')
+                    await lgwsim.send_rx(rps=(7, 125), freq=916.6, frame=su.makeDF(fcnt=self.fcnt, port=1))
                 elif self.fcnt == 3:
                     # Termination signal
-                    await lgwsim.send_rx(rps=(7, 125), freq=902.3, frame=su.makeDF(fcnt=self.fcnt, port=3))
+                    await lgwsim.send_rx(rps=(7, 125), freq=916.2, frame=su.makeDF(fcnt=self.fcnt, port=3))
                 
                 self.fcnt += 1
                 await asyncio.sleep(2.5)
@@ -130,9 +130,9 @@ class TestMuxs(tu.Muxs):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Use US915 RP2 1.0.5 config with SF5/SF6 uplink support
-        # This config has upchannels DR0-8 to allow SF5/SF6 uplinks
-        self.router_config = tu.router_config_US902_8ch_RP2_sf5sf6
+        # Use AU915 RP2 1.0.5 config with SF5/SF6 uplink support
+        # This config has upchannels DR0-10 to allow SF5/SF6 uplinks (DR9/DR10)
+        self.router_config = tu.router_config_AU915_8ch_RP2_sf5sf6
 
     async def handle_connection(self, ws):
         if self.sim_server:
@@ -149,11 +149,11 @@ class TestMuxs(tu.Muxs):
             logger.info('Downlink datarates transmitted: %s', 
                        ['0x%02x' % d for d in sim.tx_datarates])
             
-            # Check uplinks
-            if 7 not in self.uplink_drs:
-                logger.warning('DR7 (SF6/125) uplink not received')
-            if 8 not in self.uplink_drs:
-                logger.warning('DR8 (SF5/125) uplink not received')
+            # Check uplinks (AU915: DR9=SF6/125, DR10=SF5/125)
+            if 9 not in self.uplink_drs:
+                logger.warning('DR9 (SF6/125) uplink not received')
+            if 10 not in self.uplink_drs:
+                logger.warning('DR10 (SF5/125) uplink not received')
         
         if station:
             station.terminate()
@@ -182,13 +182,13 @@ class TestMuxs(tu.Muxs):
         if port == 3:
             # Termination signal
             if len(self.received_updf) >= 4:
-                # Verify we received SF5/SF6 uplinks (DR7, DR8)
-                if 7 in self.uplink_drs and 8 in self.uplink_drs:
-                    logger.info('Test completed successfully - US915 SF5/SF6 uplinks verified')
+                # Verify we received SF5/SF6 uplinks (AU915: DR9, DR10)
+                if 9 in self.uplink_drs and 10 in self.uplink_drs:
+                    logger.info('Test completed successfully - AU915 SF5/SF6 uplinks verified')
                     await self.testDone(0)
                 else:
-                    logger.error('Test failed - missing SF5/SF6 uplinks: DR7=%s DR8=%s',
-                                7 in self.uplink_drs, 8 in self.uplink_drs)
+                    logger.error('Test failed - missing SF5/SF6 uplinks: DR9=%s DR10=%s',
+                                9 in self.uplink_drs, 10 in self.uplink_drs)
                     await self.testDone(1)
             else:
                 logger.error('Test failed - only received %d uplinks', len(self.received_updf))
@@ -216,7 +216,7 @@ class TestMuxs(tu.Muxs):
             'priority': 0,
             'RxDelay' : 0,
             'RX1DR'   : dn_dr,
-            'RX1Freq' : 923300000,
+            'RX1Freq' : 923300000,  # AU915 downlink frequency
             'DevEui'  : '00-00-00-00-11-00-00-01',
             'xtime'   : msg['upinfo']['xtime']+1000000,
             'seqno'   : fcnt,

@@ -1031,8 +1031,14 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                         BWNIL, upchs.rps[insert-1].minSF, upchs.rps[insert-1].maxSF);
                     insert--;
                 }
+#if defined(CFG_sx1302) || defined(CFG_sf5sf6)
+                // With SF5/SF6 support, allow up to DR10 (AU915) or DR8 (US915)
+                int minDR = (uj_nextSlot(D), uj_intRange(D, 0, 15));
+                int maxDR = (uj_nextSlot(D), uj_intRange(D, 0, 15));
+#else
                 int minDR = (uj_nextSlot(D), uj_intRange(D, 0, 8-1)); // Currently all upchannel DRs must be specified within DRs 0-7
                 int maxDR = (uj_nextSlot(D), uj_intRange(D, 0, 8-1)); // Currently all upchannel DRs must be specified within DRs 0-7
+#endif
                 upch_insert(&upchs, insert, freq, BWNIL, minDR, maxDR);
                 uj_exitArray(D);
                 chslots++;

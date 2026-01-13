@@ -305,6 +305,37 @@ router_config_US902_8ch_RP2_sx1301 = {
                    [903700000, 0, 4]]
 }
 
+# US902 with RP2 1.0.5 - for testsim1302 SF5/SF6 testing
+# Uses sx1301_conf but allows SF5/SF6 uplinks (DR7/DR8) via sf5sf6 flag
+router_config_US902_8ch_RP2_sf5sf6 = {
+    **base_regions['US902_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 902700000},
+                     'radio_1': {'enable': True, 'freq': 903300000}}],
+    'upchannels': [[902300000, 0, 8],   # DR0-8 includes SF5/SF6 (DR7/DR8)
+                   [902500000, 0, 8],
+                   [902700000, 0, 8],
+                   [902900000, 0, 8],
+                   [903100000, 0, 8],
+                   [903300000, 0, 8],
+                   [903500000, 0, 8],
+                   [903700000, 0, 8]]
+}
+
 # AU915 with RP2 1.0.5 asymmetric datarates (SF5/SF6 support) - SX1302 version
 router_config_AU915_8ch_RP2 = {
     **base_regions['AU915_RP2_1_0_5'],
@@ -364,6 +395,37 @@ router_config_AU915_8ch_RP2_sx1301 = {
                    [917200000, 0, 6],
                    [917400000, 0, 6],
                    [917600000, 0, 6]]
+}
+
+# AU915 with RP2 1.0.5 - for testsim1302 SF5/SF6 testing
+# Uses sx1301_conf but allows SF5/SF6 uplinks (DR9/DR10) via sf5sf6 flag
+router_config_AU915_8ch_RP2_sf5sf6 = {
+    **base_regions['AU915_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 916800000},
+                     'radio_1': {'enable': True, 'freq': 917400000}}],
+    'upchannels': [[916200000, 0, 10],   # DR0-10 includes SF5/SF6 (DR9/DR10 for AU915)
+                   [916400000, 0, 10],
+                   [916600000, 0, 10],
+                   [916800000, 0, 10],
+                   [917000000, 0, 10],
+                   [917200000, 0, 10],
+                   [917400000, 0, 10],
+                   [917600000, 0, 10]]
 }
 
 router_config_KR920 = {
