@@ -69,6 +69,30 @@ base_regions = {
         'protocol': 1,
         'freq_range': [863000000, 870000000]
     },
+    # EU868 RP2 1.0.5 with SF5/SF6 at DR12/DR13
+    "EU868_RP2_1_0_5" : {
+        'msgtype': 'router_config',
+        'region': 'EU868',
+        'DRs': [(12, 125, 0),   # DR0 - SF12/125kHz
+            (11, 125, 0),       # DR1 - SF11/125kHz
+            (10, 125, 0),       # DR2 - SF10/125kHz
+            (9, 125, 0),        # DR3 - SF9/125kHz
+            (8, 125, 0),        # DR4 - SF8/125kHz
+            (7, 125, 0),        # DR5 - SF7/125kHz
+            (7, 250, 0),        # DR6 - SF7/250kHz
+            (0, 0, 0),          # DR7 - FSK 50kbps
+            (-2, 0, 0),         # DR8 - LR-FHSS (not supported)
+            (-2, 0, 0),         # DR9 - LR-FHSS (not supported)
+            (-2, 0, 0),         # DR10 - LR-FHSS (not supported)
+            (-2, 0, 0),         # DR11 - LR-FHSS (not supported)
+            (6, 125, 0),        # DR12 - SF6/125kHz (new in RP2 1.0.5)
+            (5, 125, 0),        # DR13 - SF5/125kHz (new in RP2 1.0.5)
+            (-1, 0, 0),         # DR14 - RFU
+            (-1, 0, 0)],        # DR15 - defined in TS001
+        'max_eirp': 16.0,
+        'protocol': 1,
+        'freq_range': [863000000, 870000000]
+    },
     "US902": {
         'msgtype': 'router_config',
         'region': 'US915',
@@ -213,6 +237,62 @@ router_config_EU863_6ch = {
                    [868850000, 0, 5],
                    [869050000, 0, 5],
                    [869525000, 0, 5]]
+}
+
+# EU868 RP2 1.0.5 with SF5/SF6 support (DR12/DR13) - SX1301 version
+router_config_EU868_6ch_RP2_sx1301 = {
+    **base_regions['EU868_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std':  {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -375000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -175000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if': 25000, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if': 375000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -237500, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if': 237500, 'radio': 1},
+                     'chan_multiSF_6': {'enable': False},
+                     'chan_multiSF_7': {'enable': False},
+                     'radio_0': {'enable': True, 'freq': 868475000},
+                     'radio_1': {'enable': True, 'freq': 869287500}}],
+    'upchannels': [[868100000, 0, 5],   # DR0-5 for SX1301 (no SF5/SF6 support)
+                   [868300000, 0, 5],
+                   [868500000, 0, 5],
+                   [868850000, 0, 5],
+                   [869050000, 0, 5],
+                   [869525000, 0, 5]]
+}
+
+# EU868 RP2 1.0.5 with SF5/SF6 support - for testsim1302/testms1302 testing
+router_config_EU868_6ch_RP2_sf5sf6 = {
+    **base_regions['EU868_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std':  {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -375000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -175000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if': 25000, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if': 375000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -237500, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if': 237500, 'radio': 1},
+                     'chan_multiSF_6': {'enable': False},
+                     'chan_multiSF_7': {'enable': False},
+                     'radio_0': {'enable': True, 'freq': 868475000},
+                     'radio_1': {'enable': True, 'freq': 869287500}}],
+    'upchannels': [[868100000, 0, 13],   # DR0-13 includes SF5/SF6 (DR12/DR13)
+                   [868300000, 0, 13],
+                   [868500000, 0, 13],
+                   [868850000, 0, 13],
+                   [869050000, 0, 13],
+                   [869525000, 0, 13]]
 }
 
 router_config_US902_8ch = {
