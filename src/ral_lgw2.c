@@ -208,7 +208,7 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
     } else {
         pkt_tx.preamble = txjob->preamble;
     }
-    rps_t rps = s2e_dr2rps(s2ctx, txjob->dr);
+    rps_t rps = s2e_dr2rps_dn(s2ctx, txjob->dr);
     ral_rps2lgw(rps, &pkt_tx);
     pkt_tx.freq_hz    = txjob->freq;
     pkt_tx.count_us   = txjob->xtime;

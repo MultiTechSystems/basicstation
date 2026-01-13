@@ -45,6 +45,7 @@ enum { SF12, SF11, SF10, SF9, SF8, SF7, SF6, SF5, FSK, SFNIL };
 enum { BW125, BW250, BW500, BWNIL };
 enum { RPS_DNONLY = 0x40 };
 enum { RPS_BCN = 0x80 };
+enum { RPS_LRFHSS = 0xFE };   // LR-FHSS modulation - not supported by SX130x
 enum { RPS_ILLEGAL = 0xFF };
 enum { RPS_FSK = FSK };
 typedef u1_t rps_t;
@@ -124,7 +125,10 @@ typedef struct s2ctx {
     int    (*canTx)      (struct s2ctx* s2ctx, txjob_t* txjob, int* ccaDisabled);  // region dependent
 
     u1_t     ccaEnabled;     // this region uses CCA
-    rps_t    dr_defs[DR_CNT];
+    rps_t    dr_defs[DR_CNT];    // symmetric DR definitions (legacy)
+    rps_t    dr_defs_up[DR_CNT]; // uplink DR definitions (RP2 1.0.5+)
+    rps_t    dr_defs_dn[DR_CNT]; // downlink DR definitions (RP2 1.0.5+)
+    u1_t     asymmetric_drs;     // 1 if using separate up/dn DR tables
     u2_t     dc_chnlRate;
     u4_t     dn_chnls[MAX_DNCHNLS+1];
     u4_t     min_freq;
@@ -153,6 +157,8 @@ extern u1_t s2e_dwellDisabled; // ignore dwell time limits - override for test/d
 
 
 rps_t    s2e_dr2rps (s2ctx_t*, u1_t dr);
+rps_t    s2e_dr2rps_up (s2ctx_t*, u1_t dr);  // uplink DR lookup
+rps_t    s2e_dr2rps_dn (s2ctx_t*, u1_t dr);  // downlink DR lookup
 u1_t     s2e_rps2dr (s2ctx_t*, rps_t rps);
 ustime_t s2e_calcUpAirTime (rps_t rps, u1_t plen);
 ustime_t s2e_calcDnAirTime (rps_t rps, u1_t plen, u1_t lcrc, u2_t preamble);

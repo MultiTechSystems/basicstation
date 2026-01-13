@@ -36,6 +36,8 @@
 #define J_domain               ((ujcrc_t)(0x0590E65C))
 #define J_DR                   ((ujcrc_t)(0x00004416))
 #define J_DRs                  ((ujcrc_t)(0x00445A65))
+#define J_DRs_up               ((ujcrc_t)(0xFDF00498))
+#define J_DRs_dn               ((ujcrc_t)(0xFDF01397))
 #define J_duty_cycle           ((ujcrc_t)(0x18855C82))
 #define J_enable               ((ujcrc_t)(0x0697E35F))
 #define J_error                ((ujcrc_t)(0x47A7EB1D))
