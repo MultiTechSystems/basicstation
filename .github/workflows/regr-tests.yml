@@ -14,10 +14,11 @@ jobs:
       - name: Setup environment
         run: |
           sudo apt-get install -y python3.11 python3-pip virtualenv psmisc git build-essential lcov curl netcat-openbsd
+          # jsonschema and jinja2 required for mbedtls 3.x build scripts (installed system-wide for make subprocesses)
+          pip3 install --break-system-packages jsonschema jinja2
           virtualenv --python python3.11 pyenv
           . pyenv/bin/activate
-          # jsonschema and jinja2 required for mbedtls 3.x build scripts
-          pip3 install setuptools aiohttp websockets jsonschema jinja2
+          pip3 install setuptools aiohttp websockets
       - name: Execute Tests
         env:
           MBEDTLS_VERSION: ${{ matrix.mbedtls-version }}
