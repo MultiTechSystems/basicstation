@@ -69,6 +69,13 @@ static void ensure_psa_init() {
 }
 #endif
 
+// Public function to ensure PSA is initialized (for use by other modules like cups.c)
+void tls_ensurePsaInit(void) {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    ensure_psa_init();
+#endif
+}
+
 #if defined(CFG_sysrandom)
 int tls_random (void * arg, unsigned char * buf, size_t len) {
     return sys_random(buf, (int)len);
@@ -232,6 +239,9 @@ errexit:
 
 
 int tls_setMyCert (tlsconf_t* conf, const char* cert, int certlen, const char* key, int keylen, const char* pwd) {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    ensure_psa_init();
+#endif
     mbedtls_pk_context* mykey;
     if( conf->mykey ) {
         mbedtls_pk_free(conf->mykey);
@@ -251,7 +261,15 @@ int tls_setMyCert (tlsconf_t* conf, const char* cert, int certlen, const char* k
             goto errexit;
         }
         keyb = (u1_t*)dbuf.buf;
-        keyl = dbuf.bufsize+1;
+        // For PEM format (starts with -----), include null terminator in length
+        // For DER format (starts with 0x30 ASN.1 SEQUENCE), use exact length
+        if( dbuf.bufsize > 0 && keyb[0] == 0x30 ) {
+            // DER format - use exact length
+            keyl = dbuf.bufsize;
+        } else {
+            // PEM format - include null terminator
+            keyl = dbuf.bufsize+1;
+        }
     }
 #if MBEDTLS_VERSION_NUMBER >= 0x03000000
 #if defined(CFG_sysrandom)

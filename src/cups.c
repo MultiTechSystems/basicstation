@@ -38,6 +38,7 @@
 #include "mbedtls/error.h"
 #include "mbedtls/sha512.h"
 #include "mbedtls/bignum.h"
+#include "tls.h"
 
 
 #define FAIL_CNT_THRES 6
@@ -64,6 +65,10 @@ static int cups_verifySig (cups_sig_t* sig) {
     int verified = 0;
     dbuf_t key;
     int keyid = -1;
+
+    // Ensure PSA crypto is initialized for mbedtls 3.x ECDSA operations
+    tls_ensurePsaInit();
+
     while ( (key = sys_sigKey(++keyid)).buf != NULL && !verified ) {
         if ( key.bufsize != 64 )
             continue;
