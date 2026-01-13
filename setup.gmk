@@ -89,10 +89,11 @@ CFG.arm-linux-gnueabihf = linux
 #  testms  uses a master slave model
 #  testsim1302 - testsim with SF5/SF6 support (simulated SX1302/SX1303)
 #  testms1302 - testms with SF5/SF6 support (master-slave with SX1302/SX1303)
-CFG.testsim = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw
-CFG.testsim1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw sf5sf6
-CFG.testms  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave
-CFG.testms1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave sf5sf6
+#  All test variants include 'testing' flag for simplified conditional compilation
+CFG.testsim = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw testing
+CFG.testsim1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw sf5sf6 testing
+CFG.testms  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave testing
+CFG.testms1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave sf5sf6 testing
 CFG.testfs  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw
 CFG.testpin = logini_lvl=INFO tlsdebug ral_lgw testpin
 CFG.std     = logini_lvl=INFO tlsdebug ral_lgw
