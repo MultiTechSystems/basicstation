@@ -29,8 +29,20 @@
 set -e
 cd $(dirname $0)
 
-if [[ ! -d git-repo ]]; then
-    git clone -b mbedtls-2.28.0 --single-branch --depth 1 https://github.com/ARMmbed/mbedtls.git git-repo
+# Allow overriding mbedtls version via environment variable
+# Defaults to 2.28.0 for backward compatibility
+MBEDTLS_VERSION=${MBEDTLS_VERSION:-2.28.0}
+MBEDTLS_BRANCH="mbedtls-${MBEDTLS_VERSION}"
+
+# For mbedtls 3.x, the branch naming changed to just "v3.x.x"
+if [[ "${MBEDTLS_VERSION}" == 3.* ]]; then
+    MBEDTLS_BRANCH="v${MBEDTLS_VERSION}"
+fi
+
+if [[ ! -d git-repo ]] || [[ "$(cd git-repo && git describe --tags 2>/dev/null || echo '')" != *"${MBEDTLS_VERSION}"* ]]; then
+    rm -rf git-repo
+    echo "Cloning mbedtls ${MBEDTLS_VERSION} (branch: ${MBEDTLS_BRANCH})..."
+    git clone -b "${MBEDTLS_BRANCH}" --single-branch --depth 1 https://github.com/Mbed-TLS/mbedtls.git git-repo
 fi
 
 if [[ -z "$platform" ]] || [[ -z "$variant" ]]; then
