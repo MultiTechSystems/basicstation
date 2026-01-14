@@ -42,9 +42,13 @@ function workerPid () {
 function validatePid () {
     # Make sure all running processes named station and /proc/self/exe (slave procs)
     # match all processes in process group listed in station-ap2.pid
+    # Note: Only match /proc/self/exe processes that are in the station's pgid to avoid
+    # matching unrelated processes (e.g., VS Code helper processes use /proc/self/exe)
     local pid=$(cat station-ap2.pid)
-    cmp <(ps -eo pid,ppid,pgid,command | grep -P "station[ ]|/proc/self/ex[e]") \
-	<(ps -eo pid,ppid,pgid,command | grep "$pid[ ]")
+    # Get station processes: explicit "station " OR /proc/self/exe in station's pgid
+    cmp <(ps -eo pid,ppid,pgid,command | grep "station[ ]"; \
+          ps -eo pid,ppid,pgid,command | awk -v pgid="$pid" '$3 == pgid' | grep "/proc/self/ex[e]") \
+        <(ps -eo pid,ppid,pgid,command | grep "$pid[ ]")
 }
 
 
