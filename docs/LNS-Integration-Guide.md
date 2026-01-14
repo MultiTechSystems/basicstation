@@ -5,6 +5,7 @@ This document describes the Traffic Controller (TC) JSON protocol changes introd
 ## Table of Contents
 
 - [Overview](#overview)
+- [Capability Detection](#capability-detection)
 - [Protocol Changes](#protocol-changes)
   - [Asymmetric Datarate Support](#asymmetric-datarate-support)
   - [DR Array Format](#dr-array-format)
@@ -26,6 +27,57 @@ LoRaWAN Regional Parameters 2 version 1.0.5 introduced several changes that affe
 3. **Extended DR Range**: Higher DR indices are now defined for SF5/SF6 in various regions
 
 These changes require updates to the `router_config` message sent from the LNS to Basic Station.
+
+## Capability Detection
+
+When Basic Station connects to the LNS, it sends a `version` message that includes capability information:
+
+```json
+{
+  "msgtype": "version",
+  "station": "2.1.0",
+  "firmware": "<firmware version>",
+  "package": "<firmware version>",
+  "model": "<platform identifier>",
+  "protocol": 2,
+  "features": "rmtsh gps updn-dr"
+}
+```
+
+### Feature Flags
+
+| Feature | Description |
+|---------|-------------|
+| `rmtsh` | Remote shell support enabled |
+| `gps` | GPS support enabled |
+| `prod` | Production mode (development features disabled) |
+| `updn-dr` | **Separate uplink/downlink datarate support** (RP002-1.0.5) |
+
+### Using the `updn-dr` Feature Flag
+
+The `updn-dr` feature flag indicates that Basic Station supports the `DRs_up` and `DRs_dn` fields in `router_config`. LNS implementations can use this to determine which configuration format to send:
+
+| Station Features | LNS Action |
+|-----------------|------------|
+| `updn-dr` present | Can send `DRs_up`/`DRs_dn` for RP002-1.0.5 regions |
+| `updn-dr` absent | Use legacy `DRs` field only |
+
+**Example Detection (Python):**
+
+```python
+def on_station_version(msg):
+    """Handle version message from Basic Station."""
+    features = msg.get('features', '').split()
+    
+    if 'updn-dr' in features:
+        # Station supports separate uplink/downlink datarates
+        return build_router_config_rp2()
+    else:
+        # Use legacy symmetric datarates
+        return build_router_config_legacy()
+```
+
+**Note:** SF5/SF6 hardware support is determined by the gateway's chipset (SX1302/SX1303), not by a feature flag. The `updn-dr` flag indicates protocol support for separate DR tables, which is independent of hardware capability.
 
 ## Protocol Changes
 
@@ -379,13 +431,15 @@ When sending downlink, use the downlink DR table indices:
 
 ### For LNS Developers
 
-1. **Detect Gateway Capabilities**
-   - Check if gateway reports SX1302/SX1303 hardware
-   - Only send SF5/SF6 DRs to capable hardware
+1. **Detect Station Capabilities**
+   - Parse the `features` field in the `version` message
+   - Check for `updn-dr` to determine if separate uplink/downlink DRs are supported
+   - Check hardware type (SX1302/SX1303) for SF5/SF6 support
 
 2. **Update Router Config Generation**
-   - For RP2 1.0.5 regions with asymmetric DRs, use `DRs_up` and `DRs_dn`
-   - For symmetric regions (EU868), can use either `DRs` or `DRs_up`/`DRs_dn`
+   - If `updn-dr` feature present: use `DRs_up` and `DRs_dn` for US915/AU915
+   - If `updn-dr` feature absent: use legacy `DRs` field only
+   - For symmetric regions (EU868), can use either format
 
 3. **Update Upchannels**
    - Extend `maxDR` in upchannels to include SF5/SF6 DR indices
@@ -400,8 +454,8 @@ When sending downlink, use the downlink DR table indices:
 | Scenario | Action |
 |----------|--------|
 | Old LNS + New Station | Works - Station accepts legacy `DRs` |
-| New LNS + Old Station | Works - Use `DRs` for older stations |
-| Mixed fleet | Detect capabilities, send appropriate config |
+| New LNS + Old Station | Check for `updn-dr` feature; use `DRs` if absent |
+| Mixed fleet | Detect capabilities via `features`, send appropriate config |
 
 ### Testing Recommendations
 
