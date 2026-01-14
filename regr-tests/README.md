@@ -103,6 +103,12 @@ These tests verify LoRaWAN Regional Parameters 2 1.0.5 support:
 | `test6b-au915-asym-drs` | AU915 asymmetric DR support | all |
 | `test6c-au915-sf5sf6` | AU915 SF5/SF6 uplinks (DR9/DR10) | testsim1302, testms1302 |
 | `test6d-eu868-sf5sf6` | EU868 SF5/SF6 uplinks (DR12/DR13) | testsim1302, testms1302 |
+| `test6e-as923-sf5sf6` | AS923 SF5/SF6 uplinks (DR12/DR13) | testsim1302, testms1302 |
+| `test6f-kr920-sf5sf6` | KR920 SF5/SF6 uplinks (DR12/DR13) | testsim1302, testms1302 |
+| `test6g-in865-sf5sf6` | IN865 SF5/SF6 uplinks (DR12/DR13) | testsim1302, testms1302 |
+| `test6h-as923-compat` | AS923 RP2 1.0.5 backward compatibility | all |
+| `test6i-kr920-compat` | KR920 RP2 1.0.5 backward compatibility | all |
+| `test6j-in865-compat` | IN865 RP2 1.0.5 backward compatibility | all |
 
 #### Regional SF5/SF6 DR Mapping (RP2 1.0.5)
 
@@ -111,6 +117,9 @@ These tests verify LoRaWAN Regional Parameters 2 1.0.5 support:
 | US915 | DR7 | DR8 | DR0=SF5/500, DR14=SF6/500 | Asymmetric up/down |
 | AU915 | DR9 | DR10 | DR0=SF5/500, DR14=SF6/500 | Asymmetric up/down |
 | EU868 | DR12 | DR13 | Same as uplink | Symmetric |
+| AS923 | DR12 | DR13 | Same as uplink | Symmetric |
+| KR920 | DR12 | DR13 | Same as uplink | Symmetric |
+| IN865 | DR12 | DR13 | Same as uplink | Symmetric |
 
 ### Configuration Key Tests
 
@@ -229,6 +238,12 @@ Available in `tcutils.py`:
 | `router_config_EU868_6ch_RP2_sx1301` | EU868 RP2 1.0.5 (SX1301, DR0-5 upchannels) |
 | `router_config_EU868_6ch_RP2_sf5sf6` | EU868 RP2 1.0.5 for SF5/SF6 testing (DR0-13) |
 | `router_config_EU868_6ch_radio_conf` | EU868 RP2 1.0.5 using `radio_conf` key (tests alternate config key name) |
+| `router_config_AS923_8ch_RP2_sx1301` | AS923 RP2 1.0.5 (SX1301, DR0-5 upchannels) |
+| `router_config_AS923_8ch_RP2_sf5sf6` | AS923 RP2 1.0.5 for SF5/SF6 testing (DR0-13) |
+| `router_config_KR920_3ch_RP2_sx1301` | KR920 RP2 1.0.5 (SX1301, DR0-5 upchannels) |
+| `router_config_KR920_3ch_RP2_sf5sf6` | KR920 RP2 1.0.5 for SF5/SF6 testing (DR0-13) |
+| `router_config_IN865_3ch_RP2_sx1301` | IN865 RP2 1.0.5 (SX1301, DR0-5 upchannels) |
+| `router_config_IN865_3ch_RP2_sf5sf6` | IN865 RP2 1.0.5 for SF5/SF6 testing (DR0-13) |
 
 ### Configuration Key Names
 
