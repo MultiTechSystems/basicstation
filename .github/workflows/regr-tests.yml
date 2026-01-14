@@ -58,12 +58,17 @@ jobs:
         with:
           name: test-logs-${{ matrix.variant }}
           path: regr-tests/t.log/*.log
+      - name: Collect coverage files
+        if: always()
+        run: |
+          mkdir -p regr-tests/coverage
+          find regr-tests -name '${{ matrix.variant }}*.info' -exec cp {} regr-tests/coverage/ \;
       - name: Upload coverage info
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.variant }}
-          path: regr-tests/*.info
+          path: regr-tests/coverage/
 
   # Combine coverage reports
   coverage:
@@ -83,13 +88,19 @@ jobs:
           merge-multiple: true
       - name: Merge coverage reports
         run: |
-          cd coverage
-          lcov -t "s2core" $(for f in *.info; do echo "-a $f"; done) -o ../s2core.info 2>/dev/null || true
-          cd ..
-          genhtml s2core.info -o s2core-html 2>/dev/null || true
+          # Find all .info files
+          info_files=$(find coverage -name '*.info' -type f 2>/dev/null)
+          if [ -n "$info_files" ]; then
+            lcov -t "s2core" $(for f in $info_files; do echo "-a $f"; done) -o s2core.info
+            genhtml s2core.info -o s2core-html
+          else
+            echo "No coverage files found"
+            mkdir -p s2core-html
+            echo "No coverage data" > s2core-html/index.html
+          fi
       - name: Upload combined coverage report
         uses: actions/upload-artifact@v4
         with:
           name: Coverage report
-          path: s2core-html/**
+          path: s2core-html/
 
