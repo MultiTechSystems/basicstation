@@ -35,7 +35,7 @@ function cleanup () {
 . ../testlib.sh
 
 # radioinit args
-if [[ "$TEST_VARIANT" = "testms" ]]; then
+if [[ "$TEST_VARIANT" = "testms" || "$TEST_VARIANT" = "testms1302" ]]; then
     riargs="./spidev 0"
 else
     riargs="./spidev"

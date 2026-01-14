@@ -44,7 +44,7 @@ infos = None
 muxs = None
 sim = None
 
-n_ant = 1 if os.environ['TEST_VARIANT']=='testsim' else 2
+n_ant = 1 if os.environ['TEST_VARIANT'] in ('testsim', 'testsim1302') else 2
 omni = (os.environ['ANTENNA_TYPE'] == 'omni')
 
 
