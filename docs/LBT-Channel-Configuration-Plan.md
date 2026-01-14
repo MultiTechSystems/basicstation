@@ -2,6 +2,21 @@
 
 This document outlines the plan to add configurable Listen Before Talk (LBT) channels to Basic Station, allowing the LNS to specify LBT channel frequencies separately from uplink channels.
 
+## Executive Summary
+
+**Problem:** LBT channels are currently auto-derived from uplink channels, providing no flexibility for custom LBT configurations.
+
+**Solution:** Add new `router_config` fields:
+- `lbt_enabled` - Enable/disable LBT from LNS
+- `lbt_channels` - Array of explicit LBT channel configurations
+- `lbt_rssi_target` - RSSI threshold for channel clear detection
+
+**Feature Flag:** `lbtconf` - Indicates station supports explicit LBT configuration
+
+**Backward Compatible:** If `lbt_channels` not provided, falls back to deriving from uplink channels.
+
+**Hardware:** Supports SX1301 (8 channels, FPGA LBT) and SX1302/SX1303 (16 channels, SX1261 LBT).
+
 ## Table of Contents
 
 - [Background](#background)

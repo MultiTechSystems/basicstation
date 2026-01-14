@@ -2,6 +2,23 @@
 
 This document outlines the plan to fix rejoin request handling in Basic Station. Currently, rejoin requests are incorrectly parsed using the same logic as join requests, but the frame formats differ.
 
+## Executive Summary
+
+**Problem:** Rejoin frames are rejected because code expects 23-byte join request length, but rejoin is 19 bytes (Type 0/2) or 24 bytes (Type 1).
+
+**Solution:** For rejoin frames, send raw PDU to LNS instead of parsing into fields:
+```json
+{"msgtype": "rejoin", "MHdr": 192, "PDU": "<hex>", "MIC": -123456}
+```
+
+**Msgtype:** `rejoin` already exists in code - this changes the message **format**, not the msgtype.
+
+**Rationale:** 
+- LNS has device context to properly interpret rejoin type and LoRaWAN version
+- Forward compatible with future rejoin types without station updates
+
+**Backward Compatible:** Join request parsing unchanged. Old stations drop rejoin frames silently.
+
 ## Table of Contents
 
 - [Problem Statement](#problem-statement)
@@ -226,7 +243,9 @@ Update LNS Integration Guide with new rejoin message format.
 
 ## Protocol Impact
 
-### Message Comparison
+### Message Format Change
+
+The `rejoin` msgtype already exists but currently outputs the same fields as `jreq`. This plan changes the rejoin message format to use raw PDU instead of parsed fields.
 
 **Join Request (unchanged):**
 ```json

@@ -2,6 +2,23 @@
 
 This document describes the Traffic Controller (TC) JSON protocol changes introduced to support LoRaWAN Regional Parameters 2 (RP2) version 1.0.5, including asymmetric uplink/downlink datarates and SF5/SF6 spreading factors.
 
+## Executive Summary
+
+**New Protocol Fields in `router_config`:**
+- `DRs_up` / `DRs_dn` - Separate uplink/downlink datarate tables (US915, AU915)
+- `lbt_channels` - Explicit LBT channel configuration (AS923, KR920)
+- `lbt_enabled` - Enable/disable LBT from LNS
+
+**Feature Flags** (in `version` message):
+- `updn-dr` - Station supports `DRs_up`/`DRs_dn` fields
+- `lbtconf` - Station supports `lbt_channels`/`lbt_enabled` fields
+
+**Hardware Requirements:**
+- SF5/SF6 requires SX1302/SX1303 chipset
+- SX1301 limited to SF7-SF12
+
+**Backward Compatible:** All changes are additive; legacy configurations continue to work.
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -40,7 +57,7 @@ When Basic Station connects to the LNS, it sends a `version` message that includ
   "package": "<firmware version>",
   "model": "<platform identifier>",
   "protocol": 2,
-  "features": "rmtsh gps updn-dr"
+  "features": "rmtsh gps updn-dr lbtconf"
 }
 ```
 
@@ -52,6 +69,7 @@ When Basic Station connects to the LNS, it sends a `version` message that includ
 | `gps` | GPS support enabled |
 | `prod` | Production mode (development features disabled) |
 | `updn-dr` | **Separate uplink/downlink datarate support** (RP002-1.0.5) |
+| `lbtconf` | **LBT channel configuration support** via `lbt_channels` field |
 
 ### Using the `updn-dr` Feature Flag
 
@@ -78,6 +96,17 @@ def on_station_version(msg):
 ```
 
 **Note:** SF5/SF6 hardware support is determined by the gateway's chipset (SX1302/SX1303), not by a feature flag. The `updn-dr` flag indicates protocol support for separate DR tables, which is independent of hardware capability.
+
+### Using the `lbtconf` Feature Flag
+
+The `lbtconf` feature flag indicates that Basic Station supports the `lbt_channels` and `lbt_enabled` fields in `router_config` for explicit LBT (Listen Before Talk) configuration:
+
+| Station Features | LNS Action |
+|-----------------|------------|
+| `lbtconf` present | Can send `lbt_channels`, `lbt_enabled`, `lbt_rssi_target` |
+| `lbtconf` absent | LBT channels derived from uplink channels (legacy behavior) |
+
+See [LBT Channel Configuration Plan](LBT-Channel-Configuration-Plan.md) for detailed protocol specification.
 
 ## Protocol Changes
 
