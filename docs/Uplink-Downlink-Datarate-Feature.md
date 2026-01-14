@@ -37,11 +37,17 @@ LoRaWAN Regional Parameters version 1.0.5 introduced:
 
 ### Why Separate Tables?
 
-In US915/AU915:
-- **Uplink**: 125kHz channels use SF10-SF5 (DR0-DR4, DR7-DR8)
-- **Downlink**: 500kHz channels use SF12-SF6 (DR8-DR14, DR0)
+US915 and AU915 use different channel structures for uplink vs downlink, requiring separate DR tables:
 
-The same DR index maps to different modulation parameters depending on direction.
+**US915:**
+- **Uplink**: 125kHz channels (SF10-SF7 at DR0-DR3), 500kHz (SF8 at DR4), plus SF6/SF5 at DR7-DR8
+- **Downlink**: 500kHz channels only (SF12-SF6 at DR8-DR14, SF5 at DR0)
+
+**AU915:**
+- **Uplink**: 125kHz channels (SF12-SF7 at DR0-DR5), 500kHz (SF8 at DR6), plus SF6/SF5 at DR9-DR10
+- **Downlink**: 500kHz channels only (SF12-SF6 at DR8-DR14, SF5 at DR0) - same as US915
+
+The same DR index maps to different modulation parameters depending on direction and region.
 
 ### Affected Regions
 
