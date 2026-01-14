@@ -45,13 +45,14 @@ The same DR index maps to different modulation parameters depending on direction
 
 ### Affected Regions
 
-| Region | Datarate Type | Notes |
-|--------|---------------|-------|
-| US915 | Asymmetric | Different uplink/downlink tables |
-| AU915 | Asymmetric | Different uplink/downlink tables |
-| EU868 | Symmetric | Same table, but SF5/SF6 added at DR12/DR13 |
-| AS923 | Symmetric | No changes |
-| Other | Symmetric | No changes |
+| Region | Datarate Type | SF5/SF6 DRs | Notes |
+|--------|---------------|-------------|-------|
+| US915 | Asymmetric | UL: DR7/DR8, DL: DR0/DR14 | Different uplink/downlink tables |
+| AU915 | Asymmetric | UL: DR9/DR10, DL: DR0/DR14 | Different uplink/downlink tables |
+| EU868 | Symmetric | DR12/DR13 | SF5/SF6 at 125kHz |
+| AS923 | Symmetric | DR12/DR13 | All variants (-1, -2, -3, -4) |
+| KR920 | Symmetric | DR12/DR13 | SF5/SF6 at 125kHz |
+| IN865 | Symmetric | DR12/DR13 | SF5/SF6 at 125kHz |
 
 ## Protocol Changes
 
@@ -191,9 +192,9 @@ Each DR entry is a 3-element array: `[SF, BW, dnonly]`
 }
 ```
 
-### EU868 RP002-1.0.5
+### Symmetric Regions (EU868, AS923, KR920, IN865)
 
-EU868 uses symmetric datarates (same for uplink and downlink). Can use either `DRs` or `DRs_up`/`DRs_dn`:
+All symmetric regions use the same datarate table for uplink and downlink. RP002-1.0.5 adds SF5/SF6 at DR12/DR13:
 
 | DR | Modulation | Notes |
 |----|------------|-------|
@@ -203,14 +204,16 @@ EU868 uses symmetric datarates (same for uplink and downlink). Can use either `D
 | 3 | SF9/125kHz | |
 | 4 | SF8/125kHz | |
 | 5 | SF7/125kHz | |
-| 6 | SF7/250kHz | |
-| 7 | FSK 50kbps | |
+| 6 | SF7/250kHz | EU868 only |
+| 7 | FSK 50kbps | EU868, IN865 only |
 | 8-11 | LR-FHSS | Not supported |
 | 12 | SF6/125kHz | **New in RP002-1.0.5** |
 | 13 | SF5/125kHz | **New in RP002-1.0.5** |
 | 14-15 | RFU | |
 
-**Example Configuration (symmetric):**
+**Note:** DR6 (SF7/250kHz) and DR7 (FSK) availability varies by region.
+
+**Example Configuration - EU868:**
 
 ```json
 {
@@ -224,6 +227,60 @@ EU868 uses symmetric datarates (same for uplink and downlink). Can use either `D
   ],
   "upchannels": [
     [868100000, 0, 13], [868300000, 0, 13], [868500000, 0, 13]
+  ]
+}
+```
+
+**Example Configuration - AS923:**
+
+```json
+{
+  "msgtype": "router_config",
+  "region": "AS923-1",
+  "DRs": [
+    [12, 125, 0], [11, 125, 0], [10, 125, 0], [9, 125, 0],
+    [8, 125, 0], [7, 125, 0], [7, 250, 0], [0, 0, 0],
+    [-2, 0, 0], [-2, 0, 0], [-2, 0, 0], [-2, 0, 0],
+    [6, 125, 0], [5, 125, 0], [-1, 0, 0], [-1, 0, 0]
+  ],
+  "upchannels": [
+    [923200000, 0, 13], [923400000, 0, 13]
+  ]
+}
+```
+
+**Example Configuration - KR920:**
+
+```json
+{
+  "msgtype": "router_config",
+  "region": "KR920",
+  "DRs": [
+    [12, 125, 0], [11, 125, 0], [10, 125, 0], [9, 125, 0],
+    [8, 125, 0], [7, 125, 0], [-1, 0, 0], [-1, 0, 0],
+    [-2, 0, 0], [-2, 0, 0], [-2, 0, 0], [-2, 0, 0],
+    [6, 125, 0], [5, 125, 0], [-1, 0, 0], [-1, 0, 0]
+  ],
+  "upchannels": [
+    [922100000, 0, 13], [922300000, 0, 13], [922500000, 0, 13]
+  ]
+}
+```
+
+**Example Configuration - IN865:**
+
+```json
+{
+  "msgtype": "router_config",
+  "region": "IN865",
+  "DRs": [
+    [12, 125, 0], [11, 125, 0], [10, 125, 0], [9, 125, 0],
+    [8, 125, 0], [7, 125, 0], [-1, 0, 0], [0, 0, 0],
+    [-2, 0, 0], [-2, 0, 0], [-2, 0, 0], [-2, 0, 0],
+    [6, 125, 0], [5, 125, 0], [-1, 0, 0], [-1, 0, 0]
+  ],
+  "upchannels": [
+    [865062500, 0, 13], [865402500, 0, 13], [865985000, 0, 13]
   ]
 }
 ```
@@ -306,6 +363,9 @@ For SF5/SF6 support, `maxDR` must include the new DR indices:
 | US915 | DR7 (SF6), DR8 (SF5) | 8 |
 | AU915 | DR9 (SF6), DR10 (SF5) | 10 |
 | EU868 | DR12 (SF6), DR13 (SF5) | 13 |
+| AS923 | DR12 (SF6), DR13 (SF5) | 13 |
+| KR920 | DR12 (SF6), DR13 (SF5) | 13 |
+| IN865 | DR12 (SF6), DR13 (SF5) | 13 |
 
 ## Backward Compatibility
 
