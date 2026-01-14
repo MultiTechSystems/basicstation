@@ -8,10 +8,14 @@ This document describes the Traffic Controller (TC) JSON protocol changes introd
 - `DRs_up` / `DRs_dn` - Separate uplink/downlink datarate tables (US915, AU915)
 - `lbt_channels` - Explicit LBT channel configuration (AS923, KR920)
 - `lbt_enabled` - Enable/disable LBT from LNS
+- `duty_cycle_enabled` - Enable/disable duty cycle enforcement
+- `duty_cycle_window` - Sliding window duration for duty cycle
+- `duty_cycle_limits` - Per-band or per-channel duty cycle limits
 
 **Feature Flags** (in `version` message):
 - `updn-dr` - Station supports `DRs_up`/`DRs_dn` fields
 - `lbtconf` - Station supports `lbt_channels`/`lbt_enabled` fields
+- `dutyconf` - Station supports sliding window duty cycle configuration
 
 **Hardware Requirements:**
 - SF5/SF6 requires SX1302/SX1303 chipset
@@ -70,6 +74,7 @@ When Basic Station connects to the LNS, it sends a `version` message that includ
 | `prod` | Production mode (development features disabled) |
 | `updn-dr` | **Separate uplink/downlink datarate support** (RP002-1.0.5) |
 | `lbtconf` | **LBT channel configuration support** via `lbt_channels` field |
+| `dutyconf` | **Duty cycle configuration support** via sliding window |
 
 ### Using the `updn-dr` Feature Flag
 
@@ -107,6 +112,17 @@ The `lbtconf` feature flag indicates that Basic Station supports the `lbt_channe
 | `lbtconf` absent | LBT channels derived from uplink channels (legacy behavior) |
 
 See [LBT Channel Configuration Plan](LBT-Channel-Configuration-Plan.md) for detailed protocol specification.
+
+### Using the `dutyconf` Feature Flag
+
+The `dutyconf` feature flag indicates that Basic Station supports configurable duty cycle enforcement using a sliding window approach:
+
+| Station Features | LNS Action |
+|-----------------|------------|
+| `dutyconf` present | Can send `duty_cycle_window`, `duty_cycle_limits` |
+| `dutyconf` absent | Station uses fixed time-off-air duty cycle enforcement |
+
+See [Duty Cycle Sliding Window Plan](Duty-Cycle-Sliding-Window-Plan.md) for detailed protocol specification.
 
 ## Protocol Changes
 
