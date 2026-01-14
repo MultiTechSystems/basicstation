@@ -1,32 +1,95 @@
 name: regr-tests
 on: [push]
 jobs:
-  run-regr-tests:
+  # Build all variants in parallel
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        variant: [testsim, testsim1302, testms, testms1302]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Setup build environment
+        run: sudo apt-get install -y build-essential
+      - name: Build ${{ matrix.variant }}
+        run: make platform=linux variant=${{ matrix.variant }}
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.variant }}
+          path: build-linux-${{ matrix.variant }}/
+          retention-days: 1
+
+  # Run tests for each variant in parallel
+  test:
+    needs: build
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [testsim, testsim1302, testms, testms1302]
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Setup test environment
+        run: |
+          sudo apt-get install -y python3.11 python3-pip virtualenv psmisc lcov curl netcat-openbsd
+          virtualenv --python python3.11 pyenv
+          . pyenv/bin/activate
+          pip3 install setuptools aiohttp websockets
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-${{ matrix.variant }}
+          path: build-linux-${{ matrix.variant }}/
+      - name: Make station executable
+        run: chmod +x build-linux-${{ matrix.variant }}/bin/station
+      - name: Run tests for ${{ matrix.variant }}
+        run: |
+          . pyenv/bin/activate
+          export PPSTHRES=100
+          export TX_AIM_GAP='"40ms"'
+          cd regr-tests
+          ./run-regression-tests --nohw --verbose --ghactions --nobuild --variant=${{ matrix.variant }}
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.variant }}
+          path: regr-tests/t.log/*.log
+      - name: Upload coverage info
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.variant }}
+          path: regr-tests/*.info
+
+  # Combine coverage reports
+  coverage:
+    needs: test
+    if: always()
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      - name: Setup environment
-        run: |
-          sudo apt-get install -y python3.11 python3-pip virtualenv psmisc git build-essential lcov curl netcat-openbsd
-          virtualenv --python python3.11 pyenv
-          . pyenv/bin/activate
-          pip3 install setuptools aiohttp websockets
-      - name: Execute Tests
-        run: |
-          # relax some regr test success conditions - related to timing
-          . pyenv/bin/activate
-          export PPSTHRES=100
-          export TX_AIM_GAP='"40ms"'
-          make -C regr-tests ci s2core.info
-      - name: Archive logs
-        uses: actions/upload-artifact@v4
+      - name: Setup lcov
+        run: sudo apt-get install -y lcov
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: Test logs
-          path: regr-tests/t.log/*.log
-      - name: Archive Coverage report
+          pattern: coverage-*
+          path: coverage/
+          merge-multiple: true
+      - name: Merge coverage reports
+        run: |
+          cd coverage
+          lcov -t "s2core" $(for f in *.info; do echo "-a $f"; done) -o ../s2core.info 2>/dev/null || true
+          cd ..
+          genhtml s2core.info -o s2core-html 2>/dev/null || true
+      - name: Upload combined coverage report
         uses: actions/upload-artifact@v4
         with:
           name: Coverage report
-          path: regr-tests/s2core-html/**
+          path: s2core-html/**
 
