@@ -112,6 +112,12 @@ These tests verify LoRaWAN Regional Parameters 2 1.0.5 support:
 | AU915 | DR9 | DR10 | DR0=SF5/500, DR14=SF6/500 | Asymmetric up/down |
 | EU868 | DR12 | DR13 | Same as uplink | Symmetric |
 
+### Configuration Key Tests
+
+| Test | Description | Variants |
+|------|-------------|----------|
+| `test7a-radio-conf` | Tests `radio_conf` key name (alternative to sx1301_conf/sx1302_conf) | all |
+
 ### Other Tests
 
 | Test | Description |
@@ -222,6 +228,16 @@ Available in `tcutils.py`:
 | `router_config_AU915_8ch_RP2_sf5sf6` | AU915 RP2 1.0.5 for SF5/SF6 testing (DR0-10) |
 | `router_config_EU868_6ch_RP2_sx1301` | EU868 RP2 1.0.5 (SX1301, DR0-5 upchannels) |
 | `router_config_EU868_6ch_RP2_sf5sf6` | EU868 RP2 1.0.5 for SF5/SF6 testing (DR0-13) |
+| `router_config_EU868_6ch_radio_conf` | EU868 RP2 1.0.5 using `radio_conf` key (tests alternate config key name) |
+
+### Configuration Key Names
+
+Basic Station accepts these configuration key names interchangeably:
+- `sx1301_conf` - Originally for SX1301 hardware
+- `sx1302_conf` / `SX1302_conf` - For SX1302/SX1303 hardware  
+- `radio_conf` - Generic name, works with any hardware
+
+The `router_config_EU868_6ch_radio_conf` config and `test7a-radio-conf` test ensure the `radio_conf` key is exercised in the test suite.
 
 ## Example Configurations
 

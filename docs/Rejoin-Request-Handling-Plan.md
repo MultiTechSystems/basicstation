@@ -8,7 +8,7 @@ This document outlines the plan to fix rejoin request handling in Basic Station.
 
 **Solution:** For rejoin frames, send raw PDU to LNS instead of parsing into fields:
 ```json
-{"msgtype": "rejoin", "MHdr": 192, "PDU": "<hex>", "MIC": -123456}
+{"msgtype": "rejoin", "MHdr": 192, "pdu": "<hex>", "MIC": -123456}
 ```
 
 **Msgtype:** `rejoin` already exists in code - this changes the message **format**, not the msgtype.
@@ -159,7 +159,7 @@ Instead of parsing rejoin frames into fields, send the raw PDU to the LNS:
 {
   "msgtype": "rejoin",
   "MHdr": 192,
-  "PDU": "C0010203040506070809101112131415161718",
+  "pdu": "C0010203040506070809101112131415161718",
   "MIC": -1234567890
 }
 ```
@@ -168,7 +168,7 @@ Instead of parsing rejoin frames into fields, send the raw PDU to the LNS:
 |-------|------|-------------|
 | `msgtype` | String | `"rejoin"` |
 | `MHdr` | Integer | MHDR byte value (0xC0 = 192) |
-| `PDU` | String | Full frame as hex string (includes MHdr through MIC) |
+| `pdu` | String | Full frame as hex string (includes MHdr through MIC) |
 | `MIC` | Integer | MIC extracted from last 4 bytes (for quick validation) |
 
 ## Implementation Details
@@ -215,10 +215,10 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
         uj_encKVn(buf,
                   "msgtype", 's', "rejoin",
                   "MHdr",    'i', mhdr,
-                  "PDU",     'H', len, &frame[0],
+                  "pdu",     'H', len, &frame[0],
                   "MIC",     'i', mic,
                   NULL);
-        xprintf(lbuf, "rejoin MHdr=%02X len=%d MIC=%d PDU=%H",
+        xprintf(lbuf, "rejoin MHdr=%02X len=%d MIC=%d pdu=%H",
                 mhdr, len, mic, len, &frame[0]);
         return 1;
     }
@@ -267,7 +267,7 @@ The `rejoin` msgtype already exists but currently outputs the same fields as `jr
 {
   "msgtype": "rejoin",
   "MHdr": 192,
-  "PDU": "C001AABBCC1112131415161718F1F2DEADBEEF",
+  "pdu": "C001AABBCC1112131415161718F1F2DEADBEEF",
   "MIC": -1234567890,
   "DR": 5,
   "Freq": 868100000,
@@ -288,7 +288,7 @@ Example LNS parsing (Python):
 
 ```python
 def handle_rejoin(msg):
-    pdu = bytes.fromhex(msg['PDU'])
+    pdu = bytes.fromhex(msg['pdu'])
     mhdr = pdu[0]
     rejoin_type = pdu[1]
     

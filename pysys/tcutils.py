@@ -295,6 +295,35 @@ router_config_EU868_6ch_RP2_sf5sf6 = {
                    [869525000, 0, 13]]
 }
 
+# EU868 RP2 1.0.5 using radio_conf key (tests alternate config key name)
+# Basic Station accepts sx1301_conf, sx1302_conf, and radio_conf interchangeably
+router_config_EU868_6ch_radio_conf = {
+    **base_regions['EU868_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',  # Use sx1301 for compatibility with testsim variant
+    'radio_conf': [{'chan_FSK': {'enable': False},
+                    'chan_Lora_std':  {'enable': False},
+                    'chan_multiSF_0': {'enable': True, 'if': -375000, 'radio': 0},
+                    'chan_multiSF_1': {'enable': True, 'if': -175000, 'radio': 0},
+                    'chan_multiSF_2': {'enable': True, 'if': 25000, 'radio': 0},
+                    'chan_multiSF_3': {'enable': True, 'if': 375000, 'radio': 0},
+                    'chan_multiSF_4': {'enable': True, 'if': -237500, 'radio': 1},
+                    'chan_multiSF_5': {'enable': True, 'if': 237500, 'radio': 1},
+                    'chan_multiSF_6': {'enable': False},
+                    'chan_multiSF_7': {'enable': False},
+                    'radio_0': {'enable': True, 'freq': 868475000},
+                    'radio_1': {'enable': True, 'freq': 869287500}}],
+    'upchannels': [[868100000, 0, 5],   # DR0-5 for compatibility with all variants
+                   [868300000, 0, 5],
+                   [868500000, 0, 5],
+                   [868850000, 0, 5],
+                   [869050000, 0, 5],
+                   [869525000, 0, 5]]
+}
+
 router_config_US902_8ch = {
     **base_regions['US902'],
     'JoinEui': None,
