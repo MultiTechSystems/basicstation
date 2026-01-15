@@ -1120,10 +1120,6 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                 resetDC(s2ctx, 100);      // 1%
                 break;
             }
-            case J_IN865: {
-                s2ctx->txpow = 30 * TXPOW_SCALE;
-                break;
-            }
             case J_KR920: {
                 s2ctx->ccaEnabled = 1;
                 s2ctx->canTx = s2e_canTxPerChnlDC;
