@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # --- Revised 3-Clause BSD License ---
 # Copyright Semtech Corporation 2022. All rights reserved.
 #
@@ -26,42 +24,5 @@
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-set -e
-cd $(dirname $0)
-
-# Allow overriding mbedtls version via environment variable
-# Defaults to 2.28.0 for backward compatibility
-MBEDTLS_VERSION=${MBEDTLS_VERSION:-2.28.0}
-MBEDTLS_BRANCH="mbedtls-${MBEDTLS_VERSION}"
-
-# For mbedtls 3.x, the branch naming changed to just "v3.x.x"
-if [[ "${MBEDTLS_VERSION}" == 3.* ]]; then
-    MBEDTLS_BRANCH="v${MBEDTLS_VERSION}"
-fi
-
-if [[ ! -d git-repo ]] || [[ "$(cd git-repo && git describe --tags 2>/dev/null || echo '')" != *"${MBEDTLS_VERSION}"* ]]; then
-    rm -rf git-repo platform-*
-    echo "Cloning mbedtls ${MBEDTLS_VERSION} (branch: ${MBEDTLS_BRANCH})..."
-    # mbedtls 3.x requires submodules (framework) - shallow clone doesn't work well with submodules
-    if [[ "${MBEDTLS_VERSION}" == 3.* ]]; then
-        git clone -b "${MBEDTLS_BRANCH}" --single-branch https://github.com/Mbed-TLS/mbedtls.git git-repo
-        (cd git-repo && git submodule update --init --recursive)
-    else
-        git clone -b "${MBEDTLS_BRANCH}" --single-branch --depth 1 https://github.com/Mbed-TLS/mbedtls.git git-repo
-    fi
-fi
-
-if [[ -z "$platform" ]] || [[ -z "$variant" ]]; then
-    echo "Expecting env vars platform/variant to be set - comes naturally if called from a makefile"
-    echo "If calling manually try: variant=tests platform=nix $0"
-    exit 1
-fi
-
-if [[ ! -d platform-$platform ]]; then
-    cp -a git-repo platform-$platform
-fi
-
-cd platform-$platform
-git reset --hard
-git submodule update --init --recursive 2>/dev/null || true
-make clean
+test:
+	@bash test.sh

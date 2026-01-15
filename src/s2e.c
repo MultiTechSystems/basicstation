@@ -1108,6 +1108,10 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                 resetDC(s2ctx, 3600/100);  // 100s / 1h cummulative on time under PSA = ~2.78%
                 break;
             }
+            case J_IN865: {
+                s2ctx->txpow = 30 * TXPOW_SCALE;
+                break;
+            }
             case J_IL915: {
                 s2ctx->txpow  = 14 * TXPOW_SCALE;
                 s2ctx->txpow2 = 20 * TXPOW_SCALE;
@@ -1173,7 +1177,12 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                 // FALL THRU
             }
             case J_US915: { // common region name
-                s2ctx->txpow = 26 * TXPOW_SCALE;
+                // US915 fcc allows 36dBm EIRP  30 dBm conducted power upto +6 dBi antenna gain
+                // should be 30 + antenna gain, but we don't know the antenna gain in this section
+                // the radio can't emit over 30dBm, so we set it to 36dBm to work with any antenna
+                // the gain is subtracted in the radio layer before sending, this will allow maximum power
+                // to be used for any antenna                
+                s2ctx->txpow = 36 * TXPOW_SCALE;
                 break;
             }
             case J_AU915: {

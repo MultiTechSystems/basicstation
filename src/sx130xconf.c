@@ -732,7 +732,8 @@ int sx130xconf_parse_setup (struct sx130xconf* sx130xconf, int slaveIdx,
     sx130xconf->boardconf.lorawan_public = 1;
 
 #if defined(CFG_sx1302)
-    sx130xconf->sx1261_cfg.rssi_offset = 20;
+    // set default rssi offset for MTCAP3/MTAC-003
+    sx130xconf->sx1261_cfg.rssi_offset = 8;
 #endif
 
     setDevice(sx130xconf, NULL);
@@ -964,6 +965,28 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
     sys_usleep(rt_millis(250));
     // Force a reset because MCU software may be in a weird state when we connect the first time
 #endif
+
+    bool limit_lut_to_26 = false;
+
+    switch(cca_region) {
+        case J_AS923_1:
+        case J_AS923_2:
+        case J_AS923_3:
+        case J_AS923_4: 
+        case J_AU915:
+            limit_lut_to_26 = true;
+            break;
+    };
+
+    if (limit_lut_to_26) {
+        uint8_t extra_entries = 0;
+        for( int i=0; i<sx130xconf->txlut.size; i++ ) {
+            if (sx130xconf->txlut.lut[i].rf_power > 26) {
+                extra_entries++;
+            }
+        }
+        sx130xconf->txlut.size -= extra_entries;
+    }
 
     if( log_shallLog(MOD_RAL|VERBOSE) ) {
         LOG(MOD_RAL|DEBUG, "SX130x txlut table (%d entries)", sx130xconf->txlut.size);

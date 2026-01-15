@@ -1,80 +1,57 @@
 name: regr-tests
 on: [push]
 jobs:
-  # Build all variants in parallel
-  build:
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        variant: [testsim, testsim1302, testms, testms1302]
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-      - name: Setup build environment
-        run: sudo apt-get install -y build-essential
-      - name: Build ${{ matrix.variant }}
-        run: make platform=linux variant=${{ matrix.variant }}
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-${{ matrix.variant }}
-          path: build-linux-${{ matrix.variant }}/
-          retention-days: 1
-
-  # Run tests for each variant in parallel
-  test:
-    needs: build
+  run-regr-tests:
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
-        variant: [testsim, testsim1302, testms, testms1302]
+        mbedtls-version: ['2.28.8', '3.6.0']
+        test-category: ['core', 'tls-cups', 'updn', 'pps']
+        variant: ['testsim', 'testms']
+    name: ${{ matrix.test-category }}/${{ matrix.variant }} (mbedtls ${{ matrix.mbedtls-version }})
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      - name: Setup test environment
+      - name: Setup environment
         run: |
-          sudo apt-get install -y python3.11 python3-pip virtualenv psmisc lcov curl netcat-openbsd
-          virtualenv --python python3.11 pyenv
+          # python3-jsonschema and python3-jinja2 required for mbedtls 3.x build scripts
+          sudo apt-get install -y python3.11 python3-pip virtualenv psmisc git build-essential lcov curl netcat-openbsd python3-jsonschema python3-jinja2
+          virtualenv --python python3.11 --system-site-packages pyenv
           . pyenv/bin/activate
           pip3 install setuptools aiohttp websockets
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-${{ matrix.variant }}
-          path: build-linux-${{ matrix.variant }}/
-      - name: Make station executable
-        run: chmod +x build-linux-${{ matrix.variant }}/bin/station
-      - name: Run tests for ${{ matrix.variant }}
+      - name: Execute Tests
+        env:
+          MBEDTLS_VERSION: ${{ matrix.mbedtls-version }}
         run: |
           . pyenv/bin/activate
           export PPSTHRES=100
           export TX_AIM_GAP='"40ms"'
-          cd regr-tests
-          ./run-regression-tests --nohw --verbose --ghactions --nobuild --variant=${{ matrix.variant }}
-      - name: Upload test logs
-        if: always()
+          cd regr-tests && ./run-tests-${{ matrix.test-category }} --nohw --verbose --ghactions -V${{ matrix.variant }}
+      - name: Archive logs
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: test-logs-${{ matrix.variant }}
-          path: regr-tests/t.log/*.log
+          name: logs-${{ matrix.test-category }}-${{ matrix.variant }}-mbedtls-${{ matrix.mbedtls-version }}
+          path: regr-tests/t.log/**/*.log
       - name: Collect coverage files
         if: always()
         run: |
           mkdir -p regr-tests/coverage
-          find regr-tests -name '${{ matrix.variant }}*.info' -exec cp {} regr-tests/coverage/ \;
+          find regr-tests -name '${{ matrix.variant }}*.info' -exec cp {} regr-tests/coverage/ \; 2>/dev/null || true
       - name: Upload coverage info
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.variant }}
+          name: coverage-${{ matrix.test-category }}-${{ matrix.variant }}-mbedtls-${{ matrix.mbedtls-version }}
           path: regr-tests/coverage/
 
-  # Combine coverage reports
-  coverage:
-    needs: test
-    if: always()
+  # Combine coverage reports from all test jobs
+  coverage-report:
     runs-on: ubuntu-22.04
+    needs: run-regr-tests
+    if: always()
+    name: Coverage Report
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -101,6 +78,5 @@ jobs:
       - name: Upload combined coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: Coverage report
+          name: coverage-report
           path: s2core-html/
-

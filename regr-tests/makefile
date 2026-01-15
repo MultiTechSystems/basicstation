@@ -26,16 +26,61 @@
 
 INFOS=$(shell find . -name 'test*.info')
 
+# Default: run all tests
 all:
+	./run-tests-all --nohw
+
+# Legacy runner (for backward compatibility)
+legacy:
 	./run-regression-tests --nohw
+
+#----------------------------------------------
+# Category-specific targets
+#----------------------------------------------
+
+# Core/infrastructure tests
+core:
+	./run-tests-core --nohw
+
+# TLS/CUPS/TC connection tests
+tls-cups:
+	./run-tests-tls-cups --nohw
+
+# Uplink/Downlink tests
+updn:
+	./run-tests-updn --nohw
+
+# PPS/GPS timing tests
+pps:
+	./run-tests-pps --nohw
+
+#----------------------------------------------
+# Variant-specific targets
+#----------------------------------------------
+
+# Single-slave variant only (testsim)
+sim:
+	./run-tests-all --nohw --sim
+
+# Multi-slave variant only (testms)
+ms:
+	./run-tests-all --nohw --ms
+
+#----------------------------------------------
+# CI/Slow VM targets
+#----------------------------------------------
 
 # teirich: my VM is a bit slow causing some TX to miss the deadline.
 # Cut the tests some slack...
 slow-vm:
-	TX_AIM_GAP='"40ms"' PPSTHRES=300 ./run-regression-tests --nohw
+	TX_AIM_GAP='"40ms"' PPSTHRES=300 ./run-tests-all --nohw
 
 ci:
-	./run-regression-tests --nohw --verbose --ghactions
+	./run-tests-all --nohw --verbose --ghactions
+
+#----------------------------------------------
+# Utility targets
+#----------------------------------------------
 
 # Reset test state
 reset:
@@ -66,4 +111,30 @@ clean:
 
 super-clean: clean
 
-.PHONY: all reset clean
+# Help target
+help:
+	@echo "Regression Test Targets:"
+	@echo ""
+	@echo "  all            - Run all tests (default)"
+	@echo ""
+	@echo "Category targets:"
+	@echo "  core           - Core/infrastructure tests"
+	@echo "  tls-cups       - TLS/CUPS/TC connection tests"
+	@echo "  updn           - Uplink/Downlink tests"
+	@echo "  pps            - PPS/GPS timing tests"
+	@echo ""
+	@echo "Variant targets:"
+	@echo "  sim            - Single-slave variant only (testsim)"
+	@echo "  ms             - Multi-slave variant only (testms)"
+	@echo ""
+	@echo "CI targets:"
+	@echo "  ci             - CI mode (verbose)"
+	@echo ""
+	@echo "Utility:"
+	@echo "  reset          - Clear test state"
+	@echo "  clean          - Clean build artifacts"
+	@echo "  help           - Show this help"
+
+.PHONY: all legacy core tls-cups updn pps \
+        sim ms slow-vm ci \
+        reset clean super-clean help

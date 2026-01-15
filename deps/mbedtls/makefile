@@ -30,13 +30,21 @@ PLT=platform-${platform}
 
 HFILES = $(notdir $(wildcard ${PLT}/include/mbedtls/*.h))
 MBEDINC = ${TD}/${BD}/include/mbedtls
+# PSA headers for mbedtls 3.x
+PSAHFILES = $(notdir $(wildcard ${PLT}/include/psa/*.h))
+PSAINC = ${TD}/${BD}/include/psa
 ARTEFACTS = $(patsubst -l%, ${TD}/${BD}/lib/lib%.a, ${MBEDLIBS}) \
 	${MBEDINC} \
-	$(patsubst %, ${TD}/${BD}/include/mbedtls/%, ${HFILES})
+	$(patsubst %, ${TD}/${BD}/include/mbedtls/%, ${HFILES}) \
+	$(if ${PSAHFILES},${PSAINC}) \
+	$(patsubst %, ${TD}/${BD}/include/psa/%, ${PSAHFILES})
 
 all: $(if ${HFILES},${ARTEFACTS},${PLT})
 
 ${MBEDINC}:
+	@mkdir -p $@
+
+${PSAINC}:
 	@mkdir -p $@
 
 ${PLT}/library/%.a: ${PLT}/Makefile
@@ -48,6 +56,10 @@ ${TD}/${BD}/lib/%.a: ${PLT}/library/%.a
 	@cp $< $@
 
 ${MBEDINC}/%.h: ${PLT}/include/mbedtls/%.h
+	@echo "  CP    ${<F} -> $@"
+	@cp $< $@
+
+${PSAINC}/%.h: ${PLT}/include/psa/%.h
 	@echo "  CP    ${<F} -> $@"
 	@cp $< $@
 

@@ -272,13 +272,15 @@ static void pipe_read (aio_t* aio) {
                 // Note: sx1301conf_start can take considerable amount of time (if LBT on up to 8s!!)
                 if( (status = !sx130xconf_parse_setup(&sx1301conf, sys_slaveIdx, confreq->hwspec, confreq->json, confreq->jsonlen)) ||
                     (status = !sx130xconf_challoc(&sx1301conf, &confreq->upchs)   << 1) ||
-                    (status = !sys_runRadioInit(sx1301conf.device)                << 2) ||
-                    (status = !sx130xconf_start(&sx1301conf, confreq->region)     << 3) )
+                    (status = !sys_runRadioInit(sx1301conf.device)                << 2) )
                     rt_fatal("Slave radio start up failed with status 0x%02x", status);
+                // With gpsd integration, all cards can have independent GPS/PPS capability
+                // Each slave process connects to gpsd independently
                 if( sx1301conf.pps && sys_slaveIdx ) {
-                    LOG(MOD_RAL|ERROR, "Only slave#0 may have PPS enabled");
-                    sx1301conf.pps = 0;
+                    LOG(MOD_RAL|INFO, "PPS enabled for slave#%d (multi-card PPS via gpsd)", sys_slaveIdx);
                 }
+                if( (status = !sx130xconf_start(&sx1301conf, confreq->region) << 3) )
+                    rt_fatal("Slave radio start up failed with status 0x%02x", status);
                 pps_en = sx1301conf.pps;
                 region = confreq->region;
                 txpowAdjust = sx1301conf.txpowAdjust;

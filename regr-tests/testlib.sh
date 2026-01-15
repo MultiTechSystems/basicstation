@@ -40,6 +40,11 @@ export PATH=$BUILD_DIR/bin:$PATH
 # export PYTHONPATH=${TD}/regr-tests/pysys:..:$PYTHONPATH
 export PYTHONPATH=${TD}/pysys:$PYTHONPATH
 
+# Activate Python virtual environment if it exists
+if [[ -f "${TD}/pyenv/bin/activate" ]]; then
+    source "${TD}/pyenv/bin/activate"
+fi
+
 TEST_NAME=$(basename $(dirname $(realpath $0)))
 
 # Cleanup any coverage file
