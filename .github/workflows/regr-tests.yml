@@ -35,8 +35,19 @@ jobs:
         with:
           name: logs-${{ matrix.test-category }}-${{ matrix.variant }}-mbedtls-${{ matrix.mbedtls-version }}
           path: regr-tests/t.log/**/*.log
+      - name: Collect coverage files
+        if: always()
+        run: |
+          mkdir -p regr-tests/coverage
+          find regr-tests -name '${{ matrix.variant }}*.info' -exec cp {} regr-tests/coverage/ \; 2>/dev/null || true
+      - name: Upload coverage info
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.test-category }}-${{ matrix.variant }}-mbedtls-${{ matrix.mbedtls-version }}
+          path: regr-tests/coverage/
 
-  # Aggregate coverage reports after all tests complete
+  # Combine coverage reports from all test jobs
   coverage-report:
     runs-on: ubuntu-22.04
     needs: run-regr-tests
@@ -45,24 +56,29 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      - name: Setup environment
+      - name: Setup lcov
+        run: sudo apt-get install -y lcov
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: coverage/
+          merge-multiple: true
+      - name: Merge coverage reports
         run: |
-          sudo apt-get install -y python3.11 python3-pip virtualenv psmisc git build-essential lcov curl netcat-openbsd python3-jsonschema python3-jinja2
-          virtualenv --python python3.11 --system-site-packages pyenv
-          . pyenv/bin/activate
-          pip3 install setuptools aiohttp websockets
-      - name: Generate Coverage Report
-        env:
-          MBEDTLS_VERSION: '3.6.0'
-        run: |
-          . pyenv/bin/activate
-          export PPSTHRES=100
-          export TX_AIM_GAP='"40ms"'
-          # Run all tests to generate coverage data
-          make -C regr-tests ci s2core.info || true
-      - name: Archive Coverage report
+          # Find all .info files
+          info_files=$(find coverage -name '*.info' -type f 2>/dev/null)
+          if [ -n "$info_files" ]; then
+            lcov -t "s2core" $(for f in $info_files; do echo "-a $f"; done) -o s2core.info
+            genhtml s2core.info -o s2core-html
+          else
+            echo "No coverage files found"
+            mkdir -p s2core-html
+            echo "No coverage data" > s2core-html/index.html
+          fi
+      - name: Upload combined coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: regr-tests/s2core-html/**
+          path: s2core-html/
 
