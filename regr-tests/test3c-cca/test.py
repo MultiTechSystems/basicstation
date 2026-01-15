@@ -54,6 +54,7 @@ class TestLgwSimServer(su.LgwSimServer):
     updf_task = None
     txcnt = 0
     exp_txfreq = []
+    test_muxs = None
 
     async def on_connected(self, lgwsim:su.LgwSim) -> None:
         now = lgwsim.xticks()
@@ -70,7 +71,7 @@ class TestLgwSimServer(su.LgwSimServer):
         self.txcnt += 1
         if [pkt['freq_hz']] != self.exp_txfreq[0:1]:
             logger.debug('LGWSIM: freq=%.3fMHz but expected %.3fMHz' % (pkt['freq_hz']/1e6, self.exp_txfreq[0]/1e6))
-            await self.testDone(2)
+            await self.test_muxs.testDone(2)
         del self.exp_txfreq[0]
 
 
@@ -168,6 +169,7 @@ async def test_start():
     infos = tu.Infos()
     muxs = TestMuxs()
     sim = TestLgwSimServer()
+    sim.test_muxs = muxs
 
     await infos.start_server()
     await muxs.start_server()
