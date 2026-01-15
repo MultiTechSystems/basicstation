@@ -201,10 +201,34 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
         *last = *curr;
         return TIMESYNC_RADIO_INTV;
     }
+    // Detect session change (slave restart) - reset state for this txunit
+    if( ral_xtime2sess(curr->xtime) != ral_xtime2sess(last->xtime) ) {
+        LOG(MOD_SYN|INFO, "SX130X#%d session changed: %d -> %d (slave restart?)",
+            txunit, ral_xtime2sess(last->xtime), ral_xtime2sess(curr->xtime));
+        // Reset drift stats for this txunit
+        struct txunit_stats* stats = &txunit_stats[txunit];
+        memset(stats->mcu_drifts, 0, sizeof(stats->mcu_drifts));
+        stats->mcu_drifts_widx = 0;
+        stats->excessive_drift_cnt = 0;
+        stats->drift_thres = MAX_MCU_DRIFT_THRES;
+        if( txunit == 0 ) {
+            // Primary txunit session changed - reset PPS/GPS sync state
+            // to avoid comparing xtimes from different sessions
+            sum_mcu_drifts = 0;
+            memset(&ppsSync, 0, sizeof(ppsSync));
+            ppsOffset = -1;
+            gpsOffset = 0;
+            no_pps_thres = NO_PPS_ALARM_INI;
+            pps_drifts_widx = 0;
+            LOG(MOD_SYN|WARNING, "Primary slave restarted - PPS/GPS sync reset, will re-acquire");
+        }
+        *last = *curr;
+        return TIMESYNC_RADIO_INTV;
+    }
     ustime_t dus = curr->ustime - last->ustime;
     sL_t dxc = curr->xtime - last->xtime;
     if( dxc <= 0 ) {
-        LOG(MOD_SYN|ERROR, "SX130X#%d trigger count not ticking or weird value: 0x%lX .. 0x%lX (dxc=%d)",
+        LOG(MOD_SYN|ERROR, "SX130X#%d trigger count not ticking or weird value: 0x%lX .. 0x%lX (dxc=%ld)",
             txunit, last->xtime, curr->xtime, dxc);
         return TIMESYNC_RADIO_INTV;
     }

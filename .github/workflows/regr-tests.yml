@@ -7,7 +7,8 @@ jobs:
       fail-fast: false
       matrix:
         mbedtls-version: ['2.28.8', '3.6.0']
-    name: Tests (mbedtls ${{ matrix.mbedtls-version }})
+        test-category: ['core', 'tls-cups', 'updn', 'pps']
+    name: ${{ matrix.test-category }} (mbedtls ${{ matrix.mbedtls-version }})
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -26,15 +27,41 @@ jobs:
           . pyenv/bin/activate
           export PPSTHRES=100
           export TX_AIM_GAP='"40ms"'
-          make -C regr-tests ci s2core.info
+          cd regr-tests && ./run-tests-${{ matrix.test-category }} --nohw --verbose --ghactions
       - name: Archive logs
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: Test logs (mbedtls ${{ matrix.mbedtls-version }})
-          path: regr-tests/t.log/*.log
+          name: logs-${{ matrix.test-category }}-mbedtls-${{ matrix.mbedtls-version }}
+          path: regr-tests/t.log/**/*.log
+
+  # Aggregate coverage reports after all tests complete
+  coverage-report:
+    runs-on: ubuntu-22.04
+    needs: run-regr-tests
+    if: always()
+    name: Coverage Report
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Setup environment
+        run: |
+          sudo apt-get install -y python3.11 python3-pip virtualenv psmisc git build-essential lcov curl netcat-openbsd python3-jsonschema python3-jinja2
+          virtualenv --python python3.11 --system-site-packages pyenv
+          . pyenv/bin/activate
+          pip3 install setuptools aiohttp websockets
+      - name: Generate Coverage Report
+        env:
+          MBEDTLS_VERSION: '3.6.0'
+        run: |
+          . pyenv/bin/activate
+          export PPSTHRES=100
+          export TX_AIM_GAP='"40ms"'
+          # Run all tests to generate coverage data
+          make -C regr-tests ci s2core.info || true
       - name: Archive Coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: Coverage report (mbedtls ${{ matrix.mbedtls-version }})
+          name: coverage-report
           path: regr-tests/s2core-html/**
 
