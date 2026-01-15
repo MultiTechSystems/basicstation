@@ -8,7 +8,8 @@ jobs:
       matrix:
         mbedtls-version: ['2.28.8', '3.6.0']
         test-category: ['core', 'tls-cups', 'updn', 'pps']
-    name: ${{ matrix.test-category }} (mbedtls ${{ matrix.mbedtls-version }})
+        variant: ['testsim', 'testms']
+    name: ${{ matrix.test-category }}/${{ matrix.variant }} (mbedtls ${{ matrix.mbedtls-version }})
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -27,12 +28,12 @@ jobs:
           . pyenv/bin/activate
           export PPSTHRES=100
           export TX_AIM_GAP='"40ms"'
-          cd regr-tests && ./run-tests-${{ matrix.test-category }} --nohw --verbose --ghactions
+          cd regr-tests && ./run-tests-${{ matrix.test-category }} --nohw --verbose --ghactions -V${{ matrix.variant }}
       - name: Archive logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: logs-${{ matrix.test-category }}-mbedtls-${{ matrix.mbedtls-version }}
+          name: logs-${{ matrix.test-category }}-${{ matrix.variant }}-mbedtls-${{ matrix.mbedtls-version }}
           path: regr-tests/t.log/**/*.log
 
   # Aggregate coverage reports after all tests complete
