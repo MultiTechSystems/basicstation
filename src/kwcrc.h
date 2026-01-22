@@ -34,6 +34,7 @@
 #define J_DR                   ((ujcrc_t)(0x00004416))
 #define J_DRs                  ((ujcrc_t)(0x00445A65))
 #define J_duty_cycle           ((ujcrc_t)(0x18855C82))
+#define J_duty_cycle_enabled   ((ujcrc_t)(0x8B1E97FC))
 #define J_enable               ((ujcrc_t)(0x0697E35F))
 #define J_error                ((ujcrc_t)(0x47A7EB1D))
 #define J_EU433                ((ujcrc_t)(0xE0569061))

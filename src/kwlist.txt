@@ -31,6 +31,7 @@ domain
 DR
 DRs
 duty_cycle
+duty_cycle_enabled
 enable
 error
 EU433

@@ -1083,6 +1083,16 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             break;
         }
 #endif // !defined(CFG_prod)
+        case J_duty_cycle_enabled: {
+            // Allow LNS to control duty cycle enforcement
+            // duty_cycle_enabled: true = station enforces DC limits (default)
+            // duty_cycle_enabled: false = LNS controls scheduling, station does not enforce DC
+            if( !uj_bool(D) ) {
+                s2e_dcDisabled = 1;
+                LOG(MOD_S2E|INFO, "Duty cycle enforcement disabled by LNS (duty_cycle_enabled: false)");
+            }
+            break;
+        }
         case J_sx1301_conf:
         case J_SX1301_conf:
         case J_sx1302_conf:
