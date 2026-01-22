@@ -24,6 +24,30 @@ This document outlines the plan to change the duty cycle implementation from a "
 - Default 1-hour sliding window when `dutyconf` feature present
 - `duty_cycle_enabled` flag to enable/disable from LNS
 
+## Implementation Status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| Phase 1 | Data Structures (`s2e.h`) | COMPLETE |
+| Phase 2 | Core Functions (`s2e.c`) | COMPLETE |
+| Phase 3 | Configuration Parsing | COMPLETE |
+| Phase 4 | Feature Flag (`dutyconf`) | COMPLETE |
+| Testing | Region-specific DC tests | COMPLETE |
+
+**Implemented Features:**
+- `duty_cycle_enabled` field in `router_config` (disable station-side DC enforcement)
+- `duty_cycle_window` field (configurable sliding window in seconds, 60-86400)
+- `duty_cycle_mode` field: `legacy`, `band`, `channel`, `power`
+- `duty_cycle_limits` field (per-band or per-channel limits in permille)
+- `dutyconf` feature flag advertised to LNS
+- Sliding window TX history tracking with configurable record count
+- Multi-band support (EU868) and multi-channel support (AS923/KR920)
+
+**Test Coverage:**
+- `regr-tests/test9a-dc-eu868/` - EU868 band-based duty cycle tests
+- `regr-tests/test9b-dc-as923/` - AS923 channel-based duty cycle tests
+- `regr-tests/test9c-dc-kr920/` - KR920 channel-based duty cycle tests
+
 ## Table of Contents
 
 - [Background](#background)

@@ -47,6 +47,8 @@ extern inline rps_t rps_make (int sf, int bw);
 // Fwd decl.
 static void s2e_txtimeout (tmr_t* tmr);
 static void s2e_bcntimeout (tmr_t* tmr);
+static int freq2band (u4_t freq);
+static int s2e_canTx_sliding (s2ctx_t* s2ctx, txjob_t* txjob, int* ccaDisabled);
 
 
 static void setDC (s2ctx_t* s2ctx, ustime_t t) {
@@ -62,6 +64,165 @@ static void resetDC (s2ctx_t* s2ctx, u2_t dc_chnlRate) {
     setDC(s2ctx, rt_getTime());
     s2ctx->dc_chnlRate = dc_chnlRate;
 }
+
+// ================================================================================
+// Sliding Window Duty Cycle Implementation
+// ================================================================================
+
+// Global sliding window configuration
+static u1_t dc_mode = DC_MODE_LEGACY;              // Default to legacy for backward compat
+static ustime_t dc_window_us = (ustime_t)DC_DEFAULT_WINDOW_SECS * 1000000ULL;
+
+// Band-based limits in permille (EU868 defaults)
+static u2_t dc_band_limits_permille[DC_NUM_BANDS] = {
+    [DC_DECI ] = 100,   // 10%  = 100 permille
+    [DC_CENTI] = 10,    // 1%   = 10 permille
+    [DC_MILLI] = 1,     // 0.1% = 1 permille
+};
+
+// Channel-based limit (AS923, IN865)
+static u2_t dc_channel_limit_permille = 100;  // 10% default
+
+// Power-based tiers (Thailand)
+static dc_power_tier_t dc_power_tiers[DC_MAX_POWER_LEVELS] = {
+    { .max_eirp_dbm = 17, .limit_permille = 100 },  // 10% at ≤+17dBm
+    { .max_eirp_dbm = 30, .limit_permille = 10 },   // 1% at >+17dBm
+};
+static u1_t dc_power_tier_count = 2;
+
+// Expire old records from sliding window history
+static void dc_expire_old(dc_history_t* h, ustime_t window_start) {
+    while (h->count > 0) {
+        int idx = h->head;
+        if (h->records[idx].timestamp >= window_start)
+            break;
+        h->head = (h->head + 1) % DC_MAX_RECORDS;
+        h->count--;
+    }
+}
+
+// Calculate cumulative TX time in current window
+static u4_t dc_cumulative(dc_history_t* h, ustime_t window_start) {
+    u4_t total = 0;
+    for (int i = 0; i < h->count; i++) {
+        int idx = (h->head + i) % DC_MAX_RECORDS;
+        if (h->records[idx].timestamp >= window_start)
+            total += h->records[idx].airtime_us;
+    }
+    return total;
+}
+
+// Get duty cycle limit based on mode and txjob
+static u2_t dc_get_limit(s2ctx_t* s2ctx, txjob_t* txjob) {
+    switch (dc_mode) {
+        case DC_MODE_BAND:
+            return dc_band_limits_permille[freq2band(txjob->freq)];
+        
+        case DC_MODE_CHANNEL:
+            return dc_channel_limit_permille;
+        
+        case DC_MODE_POWER: {
+            // Find tier based on TX power
+            s1_t txpow_dbm = txjob->txpow / TXPOW_SCALE;
+            for (int i = 0; i < dc_power_tier_count; i++) {
+                if (txpow_dbm <= dc_power_tiers[i].max_eirp_dbm)
+                    return dc_power_tiers[i].limit_permille;
+            }
+            // Default to most restrictive if above all tiers
+            return dc_power_tiers[dc_power_tier_count-1].limit_permille;
+        }
+        
+        default:
+            return 100;  // 10% default
+    }
+}
+
+// Ensure dc_history is allocated for this txunit
+static void dc_ensure_history(s2ctx_t* s2ctx, u1_t txunit) {
+    if (s2ctx->txunits[txunit].dc_history == NULL) {
+        s2ctx->txunits[txunit].dc_history = rt_mallocN(dc_history_t, DC_NUM_BANDS);
+        memset(s2ctx->txunits[txunit].dc_history, 0, sizeof(dc_history_t) * DC_NUM_BANDS);
+    }
+}
+
+// Get history bucket for this transmission
+static dc_history_t* dc_get_history(s2ctx_t* s2ctx, txjob_t* txjob) {
+    dc_ensure_history(s2ctx, txjob->txunit);
+    
+    switch (dc_mode) {
+        case DC_MODE_BAND:
+            return &s2ctx->txunits[txjob->txunit].dc_history[freq2band(txjob->freq)];
+        
+        case DC_MODE_CHANNEL:
+        case DC_MODE_POWER:
+            // Use single bucket (index 0) for channel/power modes
+            return &s2ctx->txunits[txjob->txunit].dc_history[0];
+        
+        default:
+            return &s2ctx->txunits[txjob->txunit].dc_history[0];
+    }
+}
+
+// Sliding window DC check - can we transmit?
+static int s2e_canTx_sliding(s2ctx_t* s2ctx, txjob_t* txjob, int* ccaDisabled) {
+    ustime_t now = rt_getTime();
+    ustime_t window_start = now - dc_window_us;
+    
+    dc_history_t* h = dc_get_history(s2ctx, txjob);
+    u2_t limit_permille = dc_get_limit(s2ctx, txjob);
+    
+    // Expire old records
+    dc_expire_old(h, window_start);
+    
+    // Calculate available TX time
+    // max_tx_us = window_us * limit_permille / 1000
+    u4_t max_tx_us = (u4_t)(dc_window_us / 1000) * limit_permille;
+    u4_t used_us = dc_cumulative(h, window_start);
+    
+    if (used_us + txjob->airtime > max_tx_us) {
+        LOG(MOD_S2E|VERBOSE, "%J %F - DC limit (sliding): used=%uus max=%uus need=%uus (%.1f%%)",
+            txjob, txjob->freq, used_us, max_tx_us, (u4_t)txjob->airtime, limit_permille/10.0);
+        return 0;
+    }
+    
+    return 1;  // Can transmit
+}
+
+// Record transmission in sliding window history
+static void dc_record_tx(s2ctx_t* s2ctx, txjob_t* txjob) {
+    if (dc_mode == DC_MODE_LEGACY)
+        return;  // Legacy mode uses update_DC instead
+    
+    dc_history_t* h = dc_get_history(s2ctx, txjob);
+    
+    if (h->count >= DC_MAX_RECORDS) {
+        // Drop oldest record
+        h->head = (h->head + 1) % DC_MAX_RECORDS;
+        h->count--;
+    }
+    
+    int idx = (h->head + h->count) % DC_MAX_RECORDS;
+    h->records[idx].timestamp = txjob->txtime;
+    h->records[idx].airtime_us = txjob->airtime;
+    h->count++;
+    
+    LOG(MOD_S2E|DEBUG, "%J %F - DC recorded: airtime=%uus count=%d",
+        txjob, txjob->freq, (u4_t)txjob->airtime, h->count);
+}
+
+// Reset sliding window history
+static void dc_reset_history(s2ctx_t* s2ctx) {
+    for (u1_t u = 0; u < MAX_TXUNITS; u++) {
+        if (s2ctx->txunits[u].dc_history != NULL) {
+            for (u1_t b = 0; b < DC_NUM_BANDS; b++) {
+                s2ctx->txunits[u].dc_history[b].head = 0;
+                s2ctx->txunits[u].dc_history[b].count = 0;
+            }
+        }
+    }
+}
+
+// ================================================================================
 
 
 static int s2e_canTxOK (s2ctx_t* s2ctx, txjob_t* txjob, int* ccaDisabled) {
@@ -621,6 +782,7 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
             LOG(MOD_S2E|DEBUG, "Tx done diid=%ld", curr->diid);
             if( !(curr->txflags & TXFLAG_TXCHECKED) ) {
                 update_DC(s2ctx, curr);
+                dc_record_tx(s2ctx, curr);  // Record for sliding window
                 curr->txflags |= TXFLAG_TXCHECKED;
                 send_dntxed(s2ctx, curr);
             }
@@ -642,14 +804,7 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
             }
             // Looks like it's on air
             update_DC(s2ctx, curr);
-            
-            
-            
-            
-            
-            
-            
-
+            dc_record_tx(s2ctx, curr);  // Record for sliding window
             curr->txflags |= TXFLAG_TXCHECKED;
             // sending dntxed here instead @txend gives nwks more time to update/inform muxs (join)
             send_dntxed(s2ctx, curr);
@@ -1090,6 +1245,73 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             if( !uj_bool(D) ) {
                 s2e_dcDisabled = 1;
                 LOG(MOD_S2E|INFO, "Duty cycle enforcement disabled by LNS (duty_cycle_enabled: false)");
+            }
+            break;
+        }
+        case J_duty_cycle_window: {
+            // Sliding window duration in seconds (60 to 86400)
+            u4_t window_sec = uj_intRange(D, 60, 86400);
+            dc_window_us = (ustime_t)window_sec * 1000000ULL;
+            LOG(MOD_S2E|INFO, "Duty cycle window set to %u seconds", window_sec);
+            break;
+        }
+        case J_duty_cycle_mode: {
+            // Duty cycle mode: "legacy", "band", "channel", "power"
+            str_t mode = uj_str(D);
+            if( strcmp(mode, "legacy") == 0 ) {
+                dc_mode = DC_MODE_LEGACY;
+            } else if( strcmp(mode, "band") == 0 ) {
+                dc_mode = DC_MODE_BAND;
+                s2ctx->canTx = s2e_canTx_sliding;
+                dc_reset_history(s2ctx);
+            } else if( strcmp(mode, "channel") == 0 ) {
+                dc_mode = DC_MODE_CHANNEL;
+                s2ctx->canTx = s2e_canTx_sliding;
+                dc_reset_history(s2ctx);
+            } else if( strcmp(mode, "power") == 0 ) {
+                dc_mode = DC_MODE_POWER;
+                s2ctx->canTx = s2e_canTx_sliding;
+                dc_reset_history(s2ctx);
+            } else {
+                LOG(MOD_S2E|WARNING, "Unknown duty_cycle_mode '%s', using legacy", mode);
+                dc_mode = DC_MODE_LEGACY;
+            }
+            LOG(MOD_S2E|INFO, "Duty cycle mode set to %d (%s)", dc_mode, mode);
+            break;
+        }
+        case J_duty_cycle_limits: {
+            // Limits depend on mode - parsed after mode is set
+            // For band mode: object with band names K/L/M/N/P/Q
+            // For channel/power mode: integer (permille)
+            if( dc_mode == DC_MODE_BAND ) {
+                // Parse as object with band limits
+                if( uj_nextValue(D) == UJ_OBJECT ) {
+                    ujcrc_t band;
+                    while( (band = uj_nextField(D)) != 0 ) {
+                        int limit = uj_intRange(D, 1, 1000);
+                        // Map band name to index (K=0.1%, L=1%, M=1%, N=0.1%, P=10%, Q=1%)
+                        // For simplified model: DECI=10%, CENTI=1%, MILLI=0.1%
+                        // Band names map to these based on frequency
+                        if( band == J_P ) dc_band_limits_permille[DC_DECI] = limit;
+                        else if( band == J_L || band == J_M || band == J_Q )
+                            dc_band_limits_permille[DC_CENTI] = limit;
+                        else if( band == J_K || band == J_N )
+                            dc_band_limits_permille[DC_MILLI] = limit;
+                    }
+                    LOG(MOD_S2E|INFO, "Duty cycle band limits: 10%%=%u, 1%%=%u, 0.1%%=%u permille",
+                        dc_band_limits_permille[DC_DECI],
+                        dc_band_limits_permille[DC_CENTI],
+                        dc_band_limits_permille[DC_MILLI]);
+                }
+            } else if( dc_mode == DC_MODE_CHANNEL ) {
+                // Single integer value (permille)
+                dc_channel_limit_permille = uj_intRange(D, 1, 1000);
+                LOG(MOD_S2E|INFO, "Duty cycle channel limit: %u permille (%.1f%%)",
+                    dc_channel_limit_permille, dc_channel_limit_permille/10.0);
+            } else if( dc_mode == DC_MODE_POWER ) {
+                // Array of power tiers - simplified parsing
+                // For now just use default power tiers
+                LOG(MOD_S2E|INFO, "Duty cycle power mode - using default tiers");
             }
             break;
         }

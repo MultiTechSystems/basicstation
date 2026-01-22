@@ -90,9 +90,42 @@ enum { MAX_UPCHNLS = MAX_130X * 10 };  // 10 channels per chip
 enum { DR_CNT = 16 };
 enum { DR_ILLEGAL = 16 };
 
+// Sliding window duty cycle configuration
+enum { DC_MAX_RECORDS = 16 };  // Max TX records per band/channel per txunit
+enum { DC_DEFAULT_WINDOW_SECS = 3600 };  // 1 hour default window
+enum { DC_MAX_POWER_LEVELS = 4 };  // Max power-based duty cycle tiers
+
+// Duty cycle modes
+enum {
+    DC_MODE_LEGACY = 0,   // Legacy time-off-air (backward compat)
+    DC_MODE_BAND = 1,     // Per frequency band (EU868)
+    DC_MODE_CHANNEL = 2,  // Single limit all channels (AS923, IN865)
+    DC_MODE_POWER = 3     // Power-based limits (Thailand)
+};
+
+// TX record for sliding window tracking
+typedef struct dc_tx_record {
+    ustime_t timestamp;    // When transmission occurred
+    u4_t     airtime_us;   // Duration in microseconds
+} dc_tx_record_t;
+
+// Sliding window history per band/channel
+typedef struct dc_history {
+    dc_tx_record_t records[DC_MAX_RECORDS];
+    u1_t head;             // Circular buffer head
+    u1_t count;            // Number of valid records
+} dc_history_t;
+
+// Power-based duty cycle tier
+typedef struct dc_power_tier {
+    s1_t max_eirp_dbm;     // Max EIRP for this tier
+    u2_t limit_permille;   // Duty cycle limit (permille = 1/1000)
+} dc_power_tier_t;
+
 typedef struct s2txunit {
-    ustime_t dc_eu868bands[DC_NUM_BANDS];
-    ustime_t dc_perChnl[MAX_DNCHNLS+1];
+    ustime_t dc_eu868bands[DC_NUM_BANDS];  // Legacy: next available time per band
+    ustime_t dc_perChnl[MAX_DNCHNLS+1];    // Legacy: next available time per channel
+    dc_history_t* dc_history;              // Sliding window: TX history per band (allocated on demand)
     txidx_t  head;
     tmr_t    timer;
 } s2txunit_t;
