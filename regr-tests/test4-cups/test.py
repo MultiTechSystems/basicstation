@@ -135,7 +135,8 @@ class TestMuxs(tu.Muxs):
             # downlinks can be scheduled which may result in unreliable downlinks.
             # await self.testDone(2)
         logger.debug('MUXS DNTXED: expected %r - ok' % (msg['seqno'],))
-        del self.exp_seqno[0]
+        if len(self.exp_seqno) > 0:
+            del self.exp_seqno[0]
 
     async def handle_updf(self, ws, msg):
         fcnt = msg['FCnt']
