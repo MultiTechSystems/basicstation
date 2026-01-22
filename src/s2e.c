@@ -78,8 +78,12 @@ void s2e_ini (s2ctx_t* s2ctx) {
     rxq_ini(&s2ctx->rxq);
 
     s2ctx->canTx = s2e_canTxOK;
-    for( u1_t i=0; i<DR_CNT; i++ )
+    for( u1_t i=0; i<DR_CNT; i++ ) {
         s2ctx->dr_defs[i] = RPS_ILLEGAL;
+        s2ctx->dr_defs_up[i] = RPS_ILLEGAL;
+        s2ctx->dr_defs_dn[i] = RPS_ILLEGAL;
+    }
+    s2ctx->asymmetric_drs = 0;
     setDC(s2ctx, USTIME_MIN);   // disable until we have a region that needs it
 
     for( int u=0; u < MAX_TXUNITS; u++ ) {
@@ -311,11 +315,29 @@ rps_t s2e_dr2rps (s2ctx_t* s2ctx, u1_t dr) {
     return dr < 16 ? s2ctx->dr_defs[dr] : RPS_ILLEGAL;
 }
 
+// Get uplink DR definition (uses asymmetric table if available)
+rps_t s2e_dr2rps_up (s2ctx_t* s2ctx, u1_t dr) {
+    if( dr >= DR_CNT )
+        return RPS_ILLEGAL;
+    if( s2ctx->asymmetric_drs )
+        return s2ctx->dr_defs_up[dr];
+    return s2ctx->dr_defs[dr];
+}
+
+// Get downlink DR definition (uses asymmetric table if available)
+rps_t s2e_dr2rps_dn (s2ctx_t* s2ctx, u1_t dr) {
+    if( dr >= DR_CNT )
+        return RPS_ILLEGAL;
+    if( s2ctx->asymmetric_drs )
+        return s2ctx->dr_defs_dn[dr];
+    return s2ctx->dr_defs[dr];
+}
 
 // This is called only for received frame (maps only to correct *up* DRs)
 u1_t s2e_rps2dr (s2ctx_t* s2ctx, rps_t rps) {
+    rps_t* dr_table = s2ctx->asymmetric_drs ? s2ctx->dr_defs_up : s2ctx->dr_defs;
     for( u1_t dr=0; dr<DR_CNT; dr++ ) {
-        if( s2ctx->dr_defs[dr] == rps )
+        if( dr_table[dr] == rps )
             return dr;
     }
     return DR_ILLEGAL;
@@ -902,6 +924,52 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             uj_exitArray(D);
             break;
         }
+        case J_DRs_up: {
+            int dr = 0;
+            uj_enterArray(D);
+            while( uj_nextSlot(D) >= 0 ) {
+                uj_enterArray(D);
+                int sfin   = (uj_nextSlot(D), uj_int(D));
+                int bwin   = (uj_nextSlot(D), uj_int(D));
+                int dnonly = (uj_nextSlot(D), uj_int(D));
+                uj_exitArray(D);
+                if( sfin < 0 ) {
+                    s2ctx->dr_defs_up[dr] = sfin == -2 ? RPS_LRFHSS : RPS_ILLEGAL;
+                } else {
+                    int bw = bwin==125 ? BW125 : bwin==250 ? BW250 : BW500;
+                    int sf = 12-sfin;
+                    rps_t rps = (sfin==0 ? FSK : rps_make(sf,bw)) | (dnonly ? RPS_DNONLY : 0);
+                    s2ctx->dr_defs_up[dr] = rps;
+                }
+                dr = min(DR_CNT-1, dr+1);
+            }
+            uj_exitArray(D);
+            s2ctx->asymmetric_drs = 1;
+            break;
+        }
+        case J_DRs_dn: {
+            int dr = 0;
+            uj_enterArray(D);
+            while( uj_nextSlot(D) >= 0 ) {
+                uj_enterArray(D);
+                int sfin   = (uj_nextSlot(D), uj_int(D));
+                int bwin   = (uj_nextSlot(D), uj_int(D));
+                int dnonly = (uj_nextSlot(D), uj_int(D));
+                uj_exitArray(D);
+                if( sfin < 0 ) {
+                    s2ctx->dr_defs_dn[dr] = sfin == -2 ? RPS_LRFHSS : RPS_ILLEGAL;
+                } else {
+                    int bw = bwin==125 ? BW125 : bwin==250 ? BW250 : BW500;
+                    int sf = 12-sfin;
+                    rps_t rps = (sfin==0 ? FSK : rps_make(sf,bw)) | (dnonly ? RPS_DNONLY : 0);
+                    s2ctx->dr_defs_dn[dr] = rps;
+                }
+                dr = min(DR_CNT-1, dr+1);
+            }
+            uj_exitArray(D);
+            s2ctx->asymmetric_drs = 1;
+            break;
+        }
         case J_upchannels: {
             uj_enterArray(D);
             while( uj_nextSlot(D) >= 0 ) {
@@ -917,8 +985,8 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                         BWNIL, upchs.rps[insert-1].minSF, upchs.rps[insert-1].maxSF);
                     insert--;
                 }
-                int minDR = (uj_nextSlot(D), uj_intRange(D, 0, 8-1)); // Currently all upchannel DRs must be specified within DRs 0-7
-                int maxDR = (uj_nextSlot(D), uj_intRange(D, 0, 8-1)); // Currently all upchannel DRs must be specified within DRs 0-7
+                int minDR = (uj_nextSlot(D), uj_intRange(D, 0, DR_CNT-1)); // DR0-15 per RP002-1.0.5
+                int maxDR = (uj_nextSlot(D), uj_intRange(D, 0, DR_CNT-1)); // DR0-15 per RP002-1.0.5
                 upch_insert(&upchs, insert, freq, BWNIL, minDR, maxDR);
                 uj_exitArray(D);
                 chslots++;

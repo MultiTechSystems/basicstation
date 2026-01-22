@@ -69,6 +69,30 @@ base_regions = {
         'protocol': 1,
         'freq_range': [863000000, 870000000]
     },
+    # EU868 RP2 1.0.5 with SF5/SF6 at DR12/DR13
+    "EU868_RP2_1_0_5" : {
+        'msgtype': 'router_config',
+        'region': 'EU868',
+        'DRs': [(12, 125, 0),   # DR0 - SF12/125kHz
+            (11, 125, 0),       # DR1 - SF11/125kHz
+            (10, 125, 0),       # DR2 - SF10/125kHz
+            (9, 125, 0),        # DR3 - SF9/125kHz
+            (8, 125, 0),        # DR4 - SF8/125kHz
+            (7, 125, 0),        # DR5 - SF7/125kHz
+            (7, 250, 0),        # DR6 - SF7/250kHz
+            (0, 0, 0),          # DR7 - FSK 50kbps
+            (-2, 0, 0),         # DR8 - LR-FHSS (not supported)
+            (-2, 0, 0),         # DR9 - LR-FHSS (not supported)
+            (-2, 0, 0),         # DR10 - LR-FHSS (not supported)
+            (-2, 0, 0),         # DR11 - LR-FHSS (not supported)
+            (6, 125, 0),        # DR12 - SF6/125kHz (new in RP2 1.0.5)
+            (5, 125, 0),        # DR13 - SF5/125kHz (new in RP2 1.0.5)
+            (-1, 0, 0),         # DR14 - RFU
+            (-1, 0, 0)],        # DR15 - defined in TS001
+        'max_eirp': 16.0,
+        'protocol': 1,
+        'freq_range': [863000000, 870000000]
+    },
     "US902": {
         'msgtype': 'router_config',
         'region': 'US915',
@@ -91,6 +115,91 @@ base_regions = {
         'max_eirp': 30.0,
         'protocol': 1,
         'freq_range': [902000000, 928000000]
+    },
+    # US902 RP2 1.0.5 with asymmetric uplink/downlink datarates
+    "US902_RP2_1_0_5": {
+        'msgtype': 'router_config',
+        'region': 'US915',
+        'DRs_up': [
+            (10, 125, 0),   # DR0 - SF10/125kHz
+            (9, 125, 0),    # DR1 - SF9/125kHz
+            (8, 125, 0),    # DR2 - SF8/125kHz
+            (7, 125, 0),    # DR3 - SF7/125kHz
+            (8, 500, 0),    # DR4 - SF8/500kHz
+            (-2, 0, 0),     # DR5 - LR-FHSS (not supported)
+            (-2, 0, 0),     # DR6 - LR-FHSS (not supported)
+            (6, 125, 0),    # DR7 - SF6/125kHz (new in RP2 1.0.5)
+            (5, 125, 0),    # DR8 - SF5/125kHz (new in RP2 1.0.5)
+            (-1, 0, 0),     # DR9-14 RFU
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0)],    # DR15 - defined in TS001
+        'DRs_dn': [
+            (5, 500, 0),    # DR0 - SF5/500kHz (new in RP2 1.0.5)
+            (-1, 0, 0),     # DR1-7 RFU
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (12, 500, 0),   # DR8 - SF12/500kHz
+            (11, 500, 0),   # DR9 - SF11/500kHz
+            (10, 500, 0),   # DR10 - SF10/500kHz
+            (9, 500, 0),    # DR11 - SF9/500kHz
+            (8, 500, 0),    # DR12 - SF8/500kHz
+            (7, 500, 0),    # DR13 - SF7/500kHz
+            (6, 500, 0),    # DR14 - SF6/500kHz (new in RP2 1.0.5)
+            (-1, 0, 0)],    # DR15 - defined in TS001
+        'max_eirp': 30.0,
+        'protocol': 1,
+        'freq_range': [902000000, 928000000]
+    },
+    # AU915 RP2 1.0.5 with asymmetric uplink/downlink datarates
+    # Downlink is same as US915, uplink differs (SF12-SF7 at DR0-5)
+    "AU915_RP2_1_0_5": {
+        'msgtype': 'router_config',
+        'region': 'AU915',
+        'DRs_up': [
+            (12, 125, 0),   # DR0 - SF12/125kHz
+            (11, 125, 0),   # DR1 - SF11/125kHz
+            (10, 125, 0),   # DR2 - SF10/125kHz
+            (9, 125, 0),    # DR3 - SF9/125kHz
+            (8, 125, 0),    # DR4 - SF8/125kHz
+            (7, 125, 0),    # DR5 - SF7/125kHz
+            (8, 500, 0),    # DR6 - SF8/500kHz
+            (-2, 0, 0),     # DR7 - LR-FHSS (not supported)
+            (-1, 0, 0),     # DR8 - RFU
+            (6, 125, 0),    # DR9 - SF6/125kHz (new in RP2 1.0.5)
+            (5, 125, 0),    # DR10 - SF5/125kHz (new in RP2 1.0.5)
+            (-1, 0, 0),     # DR11-14 RFU
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0)],    # DR15 - defined in TS001
+        'DRs_dn': [
+            (5, 500, 0),    # DR0 - SF5/500kHz (new in RP2 1.0.5)
+            (-1, 0, 0),     # DR1-7 RFU
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (12, 500, 0),   # DR8 - SF12/500kHz
+            (11, 500, 0),   # DR9 - SF11/500kHz
+            (10, 500, 0),   # DR10 - SF10/500kHz
+            (9, 500, 0),    # DR11 - SF9/500kHz
+            (8, 500, 0),    # DR12 - SF8/500kHz
+            (7, 500, 0),    # DR13 - SF7/500kHz
+            (6, 500, 0),    # DR14 - SF6/500kHz (new in RP2 1.0.5)
+            (-1, 0, 0)],    # DR15 - defined in TS001
+        'max_eirp': 30.0,
+        'protocol': 1,
+        'freq_range': [915000000, 928000000]
     }
 }
 base_regions["KR920"] = {
@@ -101,6 +210,82 @@ base_regions["KR920"] = {
         'protocol': 1,
         'freq_range': [920900000, 923300000],
     }
+
+# AS923 RP2 1.0.5 with SF5/SF6 at DR12/DR13 (symmetric)
+# Used for AS923-1, AS923-2, AS923-3, AS923-4 variants
+base_regions["AS923_RP2_1_0_5"] = {
+    'msgtype': 'router_config',
+    'region': 'AS923-1',  # Default to AS923-1, override for variants
+    'DRs': [(12, 125, 0),   # DR0 - SF12/125kHz
+        (11, 125, 0),       # DR1 - SF11/125kHz
+        (10, 125, 0),       # DR2 - SF10/125kHz
+        (9, 125, 0),        # DR3 - SF9/125kHz
+        (8, 125, 0),        # DR4 - SF8/125kHz
+        (7, 125, 0),        # DR5 - SF7/125kHz
+        (7, 250, 0),        # DR6 - SF7/250kHz
+        (0, 0, 0),          # DR7 - FSK 50kbps
+        (-2, 0, 0),         # DR8 - LR-FHSS (not supported)
+        (-2, 0, 0),         # DR9 - LR-FHSS (not supported)
+        (-2, 0, 0),         # DR10 - LR-FHSS (not supported)
+        (-2, 0, 0),         # DR11 - LR-FHSS (not supported)
+        (6, 125, 0),        # DR12 - SF6/125kHz (new in RP2 1.0.5)
+        (5, 125, 0),        # DR13 - SF5/125kHz (new in RP2 1.0.5)
+        (-1, 0, 0),         # DR14 - RFU
+        (-1, 0, 0)],        # DR15 - defined in TS001
+    'max_eirp': 16.0,
+    'protocol': 1,
+    'freq_range': [915000000, 928000000]  # AS923-1 default range
+}
+
+# KR920 RP2 1.0.5 with SF5/SF6 at DR12/DR13 (symmetric)
+base_regions["KR920_RP2_1_0_5"] = {
+    'msgtype': 'router_config',
+    'region': 'KR920',
+    'DRs': [(12, 125, 0),   # DR0 - SF12/125kHz
+        (11, 125, 0),       # DR1 - SF11/125kHz
+        (10, 125, 0),       # DR2 - SF10/125kHz
+        (9, 125, 0),        # DR3 - SF9/125kHz
+        (8, 125, 0),        # DR4 - SF8/125kHz
+        (7, 125, 0),        # DR5 - SF7/125kHz
+        (7, 250, 0),        # DR6 - SF7/250kHz
+        (0, 0, 0),          # DR7 - FSK 50kbps
+        (-2, 0, 0),         # DR8 - LR-FHSS (not supported)
+        (-2, 0, 0),         # DR9 - LR-FHSS (not supported)
+        (-2, 0, 0),         # DR10 - LR-FHSS (not supported)
+        (-2, 0, 0),         # DR11 - LR-FHSS (not supported)
+        (6, 125, 0),        # DR12 - SF6/125kHz (new in RP2 1.0.5)
+        (5, 125, 0),        # DR13 - SF5/125kHz (new in RP2 1.0.5)
+        (-1, 0, 0),         # DR14 - RFU
+        (-1, 0, 0)],        # DR15 - defined in TS001
+    'max_eirp': 14.0,
+    'protocol': 1,
+    'freq_range': [920900000, 923300000]
+}
+
+# IN865 RP2 1.0.5 with SF5/SF6 at DR12/DR13 (symmetric)
+base_regions["IN865_RP2_1_0_5"] = {
+    'msgtype': 'router_config',
+    'region': 'IN865',
+    'DRs': [(12, 125, 0),   # DR0 - SF12/125kHz
+        (11, 125, 0),       # DR1 - SF11/125kHz
+        (10, 125, 0),       # DR2 - SF10/125kHz
+        (9, 125, 0),        # DR3 - SF9/125kHz
+        (8, 125, 0),        # DR4 - SF8/125kHz
+        (7, 125, 0),        # DR5 - SF7/125kHz
+        (7, 250, 0),        # DR6 - SF7/250kHz
+        (0, 0, 0),          # DR7 - FSK 50kbps
+        (-2, 0, 0),         # DR8 - LR-FHSS (not supported)
+        (-2, 0, 0),         # DR9 - LR-FHSS (not supported)
+        (-2, 0, 0),         # DR10 - LR-FHSS (not supported)
+        (-2, 0, 0),         # DR11 - LR-FHSS (not supported)
+        (6, 125, 0),        # DR12 - SF6/125kHz (new in RP2 1.0.5)
+        (5, 125, 0),        # DR13 - SF5/125kHz (new in RP2 1.0.5)
+        (-1, 0, 0),         # DR14 - RFU
+        (-1, 0, 0)],        # DR15 - defined in TS001
+    'max_eirp': 30.0,
+    'protocol': 1,
+    'freq_range': [865000000, 867000000]
+}
 
 
 router_config_EU863_6ch = {
@@ -123,6 +308,91 @@ router_config_EU863_6ch = {
                      'radio_0': {'enable': True, 'freq': 868475000},
                      'radio_1': {'enable': True, 'freq': 869287500}}],
     'upchannels': [[868100000, 0, 5],
+                   [868300000, 0, 5],
+                   [868500000, 0, 5],
+                   [868850000, 0, 5],
+                   [869050000, 0, 5],
+                   [869525000, 0, 5]]
+}
+
+# EU868 RP2 1.0.5 with SF5/SF6 support (DR12/DR13) - SX1301 version
+router_config_EU868_6ch_RP2_sx1301 = {
+    **base_regions['EU868_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std':  {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -375000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -175000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if': 25000, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if': 375000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -237500, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if': 237500, 'radio': 1},
+                     'chan_multiSF_6': {'enable': False},
+                     'chan_multiSF_7': {'enable': False},
+                     'radio_0': {'enable': True, 'freq': 868475000},
+                     'radio_1': {'enable': True, 'freq': 869287500}}],
+    'upchannels': [[868100000, 0, 5],   # DR0-5 for SX1301 (no SF5/SF6 support)
+                   [868300000, 0, 5],
+                   [868500000, 0, 5],
+                   [868850000, 0, 5],
+                   [869050000, 0, 5],
+                   [869525000, 0, 5]]
+}
+
+# EU868 RP2 1.0.5 with SF5/SF6 support - for testsim1302/testms1302 testing
+router_config_EU868_6ch_RP2_sf5sf6 = {
+    **base_regions['EU868_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std':  {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -375000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -175000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if': 25000, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if': 375000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -237500, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if': 237500, 'radio': 1},
+                     'chan_multiSF_6': {'enable': False},
+                     'chan_multiSF_7': {'enable': False},
+                     'radio_0': {'enable': True, 'freq': 868475000},
+                     'radio_1': {'enable': True, 'freq': 869287500}}],
+    'upchannels': [[868100000, 0, 13],   # DR0-13 includes SF5/SF6 (DR12/DR13)
+                   [868300000, 0, 13],
+                   [868500000, 0, 13],
+                   [868850000, 0, 13],
+                   [869050000, 0, 13],
+                   [869525000, 0, 13]]
+}
+
+# EU868 RP2 1.0.5 using radio_conf key (tests alternate config key name)
+# Basic Station accepts sx1301_conf, sx1302_conf, and radio_conf interchangeably
+router_config_EU868_6ch_radio_conf = {
+    **base_regions['EU868_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',  # Use sx1301 for compatibility with testsim variant
+    'radio_conf': [{'chan_FSK': {'enable': False},
+                    'chan_Lora_std':  {'enable': False},
+                    'chan_multiSF_0': {'enable': True, 'if': -375000, 'radio': 0},
+                    'chan_multiSF_1': {'enable': True, 'if': -175000, 'radio': 0},
+                    'chan_multiSF_2': {'enable': True, 'if': 25000, 'radio': 0},
+                    'chan_multiSF_3': {'enable': True, 'if': 375000, 'radio': 0},
+                    'chan_multiSF_4': {'enable': True, 'if': -237500, 'radio': 1},
+                    'chan_multiSF_5': {'enable': True, 'if': 237500, 'radio': 1},
+                    'chan_multiSF_6': {'enable': False},
+                    'chan_multiSF_7': {'enable': False},
+                    'radio_0': {'enable': True, 'freq': 868475000},
+                    'radio_1': {'enable': True, 'freq': 869287500}}],
+    'upchannels': [[868100000, 0, 5],   # DR0-5 for compatibility with all variants
                    [868300000, 0, 5],
                    [868500000, 0, 5],
                    [868850000, 0, 5],
@@ -159,6 +429,189 @@ router_config_US902_8ch = {
                    [903700000, 0, 5]]
 }
 
+# US902 with RP2 1.0.5 asymmetric datarates (SF5/SF6 support) - SX1302 version
+router_config_US902_8ch_RP2 = {
+    **base_regions['US902_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1302/1',  # SX1302 required for SF5/SF6
+    'sx1302_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 902700000},
+                     'radio_1': {'enable': True, 'freq': 903300000}}],
+    'upchannels': [[902300000, 0, 8],   # DR0-8 (SF5/SF6 now valid for uplink)
+                   [902500000, 0, 8],
+                   [902700000, 0, 8],
+                   [902900000, 0, 8],
+                   [903100000, 0, 8],
+                   [903300000, 0, 8],
+                   [903500000, 0, 8],
+                   [903700000, 0, 8]]
+}
+
+# US902 with RP2 1.0.5 asymmetric datarates - SX1301 version for testsim
+# Note: SF5/SF6 uplinks not supported on SX1301, but asymmetric DR tables work
+router_config_US902_8ch_RP2_sx1301 = {
+    **base_regions['US902_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 902700000},
+                     'radio_1': {'enable': True, 'freq': 903300000}}],
+    'upchannels': [[902300000, 0, 4],   # DR0-4 for SX1301 (SF10-SF7 + SF8/500)
+                   [902500000, 0, 4],
+                   [902700000, 0, 4],
+                   [902900000, 0, 4],
+                   [903100000, 0, 4],
+                   [903300000, 0, 4],
+                   [903500000, 0, 4],
+                   [903700000, 0, 4]]
+}
+
+# US902 with RP2 1.0.5 - for testsim1302 SF5/SF6 testing
+# Uses sx1301_conf but allows SF5/SF6 uplinks (DR7/DR8) via sf5sf6 flag
+router_config_US902_8ch_RP2_sf5sf6 = {
+    **base_regions['US902_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 902700000},
+                     'radio_1': {'enable': True, 'freq': 903300000}}],
+    'upchannels': [[902300000, 0, 8],   # DR0-8 includes SF5/SF6 (DR7/DR8)
+                   [902500000, 0, 8],
+                   [902700000, 0, 8],
+                   [902900000, 0, 8],
+                   [903100000, 0, 8],
+                   [903300000, 0, 8],
+                   [903500000, 0, 8],
+                   [903700000, 0, 8]]
+}
+
+# AU915 with RP2 1.0.5 asymmetric datarates (SF5/SF6 support) - SX1302 version
+router_config_AU915_8ch_RP2 = {
+    **base_regions['AU915_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1302/1',  # SX1302 required for SF5/SF6
+    'sx1302_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 916800000},
+                     'radio_1': {'enable': True, 'freq': 917400000}}],
+    'upchannels': [[916200000, 0, 10],   # DR0-10 (SF5/SF6 at DR9/DR10 for AU915)
+                   [916400000, 0, 10],
+                   [916600000, 0, 10],
+                   [916800000, 0, 10],
+                   [917000000, 0, 10],
+                   [917200000, 0, 10],
+                   [917400000, 0, 10],
+                   [917600000, 0, 10]]
+}
+
+# AU915 with RP2 1.0.5 asymmetric datarates - SX1301 version for testsim
+# Note: SF5/SF6 uplinks not supported on SX1301, but asymmetric DR tables work
+router_config_AU915_8ch_RP2_sx1301 = {
+    **base_regions['AU915_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 916800000},
+                     'radio_1': {'enable': True, 'freq': 917400000}}],
+    'upchannels': [[916200000, 0, 6],   # DR0-6 for SX1301 (SF12-SF7 + SF8/500)
+                   [916400000, 0, 6],
+                   [916600000, 0, 6],
+                   [916800000, 0, 6],
+                   [917000000, 0, 6],
+                   [917200000, 0, 6],
+                   [917400000, 0, 6],
+                   [917600000, 0, 6]]
+}
+
+# AU915 with RP2 1.0.5 - for testsim1302 SF5/SF6 testing
+# Uses sx1301_conf but allows SF5/SF6 uplinks (DR9/DR10) via sf5sf6 flag
+router_config_AU915_8ch_RP2_sf5sf6 = {
+    **base_regions['AU915_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': True, 'if':   300000, 'radio': 0},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 916800000},
+                     'radio_1': {'enable': True, 'freq': 917400000}}],
+    'upchannels': [[916200000, 0, 10],   # DR0-10 includes SF5/SF6 (DR9/DR10 for AU915)
+                   [916400000, 0, 10],
+                   [916600000, 0, 10],
+                   [916800000, 0, 10],
+                   [917000000, 0, 10],
+                   [917200000, 0, 10],
+                   [917400000, 0, 10],
+                   [917600000, 0, 10]]
+}
 
 router_config_KR920 = {
     **base_regions['KR920'],
@@ -182,6 +635,168 @@ router_config_KR920 = {
     'upchannels': [(922100000, 0, 5),
                    (922300000, 0, 5),
                    (922500000, 0, 5)]
+}
+
+# AS923-1 RP2 1.0.5 - SX1301 backward compatible (DR0-5)
+router_config_AS923_8ch_RP2_sx1301 = {
+    **base_regions['AS923_RP2_1_0_5'],
+    'region': 'AS923-1',
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std':  {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 923000000},
+                     'radio_1': {'enable': True, 'freq': 923600000}}],
+    'upchannels': [[922200000, 0, 5],   # DR0-5 for SX1301 (no SF5/SF6)
+                   [922400000, 0, 5],
+                   [922600000, 0, 5],
+                   [922800000, 0, 5],
+                   [923000000, 0, 5],
+                   [923200000, 0, 5],
+                   [923400000, 0, 5],
+                   [923600000, 0, 5]]
+}
+
+# AS923-1 RP2 1.0.5 - for SF5/SF6 testing (testsim1302/testms1302)
+router_config_AS923_8ch_RP2_sf5sf6 = {
+    **base_regions['AS923_RP2_1_0_5'],
+    'region': 'AS923-1',
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std':  {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -400000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if':  0, 'radio': 0},
+                     'chan_multiSF_3': {'enable': True, 'if':  200000, 'radio': 0},
+                     'chan_multiSF_4': {'enable': True, 'if': -200000, 'radio': 1},
+                     'chan_multiSF_5': {'enable': True, 'if':  0, 'radio': 1},
+                     'chan_multiSF_6': {'enable': True, 'if':  200000, 'radio': 1},
+                     'chan_multiSF_7': {'enable': True, 'if':  400000, 'radio': 1},
+                     'radio_0': {'enable': True, 'freq': 923000000},
+                     'radio_1': {'enable': True, 'freq': 923600000}}],
+    'upchannels': [[922200000, 0, 13],   # DR0-13 includes SF5/SF6 (DR12/DR13)
+                   [922400000, 0, 13],
+                   [922600000, 0, 13],
+                   [922800000, 0, 13],
+                   [923000000, 0, 13],
+                   [923200000, 0, 13],
+                   [923400000, 0, 13],
+                   [923600000, 0, 13]]
+}
+
+# KR920 RP2 1.0.5 - SX1301 backward compatible (DR0-5)
+router_config_KR920_3ch_RP2_sx1301 = {
+    **base_regions['KR920_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': 0, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if': 200000, 'radio': 0},
+                     'chan_multiSF_3': {'enable': False},
+                     'chan_multiSF_4': {'enable': False},
+                     'chan_multiSF_5': {'enable': False},
+                     'chan_multiSF_6': {'enable': False},
+                     'chan_multiSF_7': {'enable': False},
+                     'radio_0': {'enable': True, 'freq': 922300000},
+                     'radio_1': {'enable': False, 'freq': 0}}],
+    'upchannels': [(922100000, 0, 5),   # DR0-5 for SX1301 (no SF5/SF6)
+                   (922300000, 0, 5),
+                   (922500000, 0, 5)]
+}
+
+# KR920 RP2 1.0.5 - for SF5/SF6 testing (testsim1302/testms1302)
+router_config_KR920_3ch_RP2_sf5sf6 = {
+    **base_regions['KR920_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': 0, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if': 200000, 'radio': 0},
+                     'chan_multiSF_3': {'enable': False},
+                     'chan_multiSF_4': {'enable': False},
+                     'chan_multiSF_5': {'enable': False},
+                     'chan_multiSF_6': {'enable': False},
+                     'chan_multiSF_7': {'enable': False},
+                     'radio_0': {'enable': True, 'freq': 922300000},
+                     'radio_1': {'enable': False, 'freq': 0}}],
+    'upchannels': [(922100000, 0, 13),   # DR0-13 includes SF5/SF6 (DR12/DR13)
+                   (922300000, 0, 13),
+                   (922500000, 0, 13)]
+}
+
+# IN865 RP2 1.0.5 - SX1301 backward compatible (DR0-5)
+router_config_IN865_3ch_RP2_sx1301 = {
+    **base_regions['IN865_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': 0, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if': 200000, 'radio': 0},
+                     'chan_multiSF_3': {'enable': False},
+                     'chan_multiSF_4': {'enable': False},
+                     'chan_multiSF_5': {'enable': False},
+                     'chan_multiSF_6': {'enable': False},
+                     'chan_multiSF_7': {'enable': False},
+                     'radio_0': {'enable': True, 'freq': 865402500},
+                     'radio_1': {'enable': False, 'freq': 0}}],
+    'upchannels': [(865062500, 0, 5),   # DR0-5 for SX1301 (no SF5/SF6)
+                   (865402500, 0, 5),
+                   (865985000, 0, 5)]
+}
+
+# IN865 RP2 1.0.5 - for SF5/SF6 testing (testsim1302/testms1302)
+router_config_IN865_3ch_RP2_sf5sf6 = {
+    **base_regions['IN865_RP2_1_0_5'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': 0, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if': 200000, 'radio': 0},
+                     'chan_multiSF_3': {'enable': False},
+                     'chan_multiSF_4': {'enable': False},
+                     'chan_multiSF_5': {'enable': False},
+                     'chan_multiSF_6': {'enable': False},
+                     'chan_multiSF_7': {'enable': False},
+                     'radio_0': {'enable': True, 'freq': 865402500},
+                     'radio_1': {'enable': False, 'freq': 0}}],
+    'upchannels': [(865062500, 0, 13),   # DR0-13 includes SF5/SF6 (DR12/DR13)
+                   (865402500, 0, 13),
+                   (865985000, 0, 13)]
 }
 
 GPS_EPOCH=datetime(1980,1,6)
@@ -281,7 +896,7 @@ class Muxs(ServerABC):
         path = get_ws_path(ws)
         logger.debug('. MUXS connect: %s' % (path,))
         if path != '/router':
-            await ws.close(1020)
+            await ws.close(4000)
         self.ws = ws
         rconf = self.get_router_config()
         await ws.send(json.dumps(rconf))

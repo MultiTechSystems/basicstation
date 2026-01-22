@@ -30,6 +30,8 @@ dntxed
 domain
 DR
 DRs
+DRs_up
+DRs_dn
 duty_cycle
 enable
 error
