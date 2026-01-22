@@ -26,9 +26,17 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "mbedtls/version.h"
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
 #include "mbedtls/net_sockets.h"
+#include "psa/crypto.h"
+#else
+#include "mbedtls/net.h"
+#endif
 #include "mbedtls/ssl.h"
+#if MBEDTLS_VERSION_NUMBER < 0x03000000
 #include "mbedtls/certs.h"
+#endif
 #include "mbedtls/entropy.h"
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/error.h"
@@ -49,6 +57,25 @@ struct tlsconf {
 
 u1_t tls_dbgLevel;
 
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+static int psa_initialized = 0;
+static void ensure_psa_init() {
+    if( psa_initialized )
+        return;
+    psa_status_t psa_ret = psa_crypto_init();
+    if( psa_ret != PSA_SUCCESS )
+        rt_fatal("psa_crypto_init failed: %d", (int)psa_ret);
+    psa_initialized = 1;
+}
+#endif
+
+// Public function to ensure PSA is initialized (for use by other modules like cups.c)
+void tls_ensurePsaInit(void) {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    ensure_psa_init();
+#endif
+}
+
 #if defined(CFG_sysrandom)
 int tls_random (void * arg, unsigned char * buf, size_t len) {
     return sys_random(buf, (int)len);
@@ -65,6 +92,9 @@ static mbedtls_ctr_drbg_context* assertDBRG () {
     if( DBRG != NULL )
         return &DBRG->ctr_drbg;
     DBRG = rt_malloc(drbg_t);
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    ensure_psa_init();
+#endif
     mbedtls_entropy_init(&DBRG->entropy);
     mbedtls_ctr_drbg_init(&DBRG->ctr_drbg);
     u1_t seed[16];
@@ -209,6 +239,9 @@ errexit:
 
 
 int tls_setMyCert (tlsconf_t* conf, const char* cert, int certlen, const char* key, int keylen, const char* pwd) {
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+    ensure_psa_init();
+#endif
     mbedtls_pk_context* mykey;
     if( conf->mykey ) {
         mbedtls_pk_free(conf->mykey);
@@ -228,9 +261,26 @@ int tls_setMyCert (tlsconf_t* conf, const char* cert, int certlen, const char* k
             goto errexit;
         }
         keyb = (u1_t*)dbuf.buf;
-        keyl = dbuf.bufsize+1;
+        // For PEM format (starts with -----), include null terminator in length
+        // For DER format (starts with 0x30 ASN.1 SEQUENCE), use exact length
+        if( dbuf.bufsize > 0 && keyb[0] == 0x30 ) {
+            // DER format - use exact length
+            keyl = dbuf.bufsize;
+        } else {
+            // PEM format - include null terminator
+            keyl = dbuf.bufsize+1;
+        }
     }
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+#if defined(CFG_sysrandom)
+    ensure_psa_init();
+    if( (ret = mbedtls_pk_parse_key(mykey, keyb, keyl, (const u1_t*)pwd, pwd?strlen(pwd):0, tls_random, NULL)) != 0 ) {
+#else
+    if( (ret = mbedtls_pk_parse_key(mykey, keyb, keyl, (const u1_t*)pwd, pwd?strlen(pwd):0, mbedtls_ctr_drbg_random, assertDBRG())) != 0 ) {
+#endif
+#else
     if( (ret = mbedtls_pk_parse_key(mykey, keyb, keyl, (const u1_t*)pwd, pwd?strlen(pwd):0)) != 0 ) {
+#endif
         log_mbedError(ERROR, ret, "Parsing key");
         goto errexit;
     }

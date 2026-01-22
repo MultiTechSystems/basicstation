@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# --- Revised 3-Clause BSD License ---
+# Copyright Semtech Corporation 2022. All rights reserved.
+#
+# TLS/CUPS/TC connection tests
+# These tests verify secure connections, CUPS updates, and TC protocol
+
+. $(dirname $0)/run-tests-common
+
+TESTS="test3-updn-tls test3a-updn-tls test4-cups test5-rmtsh test5-runcmd test8-web"
+CATEGORY="tls-cups"
+
+run_tests "$@"
