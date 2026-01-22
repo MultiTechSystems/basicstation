@@ -266,6 +266,9 @@ class LgwSimServer:
             p += await reader.read(Lgw2.SIZE_PKT_TX - Lgw1.SIZE_PKT_TX)
             pkt = Lgw2.unpack_pkt_tx(p)
         timeOffset = (pkt['freq_hz']<<32) + pkt['count_us']
+        # Handle signed 64-bit timeOffset (negative when station starts early in VM lifecycle)
+        if timeOffset >= (1 << 63):
+            timeOffset -= (1 << 64)
         unitIdx = pkt['f_dev']
         lgwsim = self.make_lgwsim(unitIdx, hal, timeOffset, reader, writer)
         logger.debug('  LgwSimServer: SPI device #%d connected (timeOffset=0x%X xticksNow=0x%X)' % (unitIdx, timeOffset, lgwsim.xticks()))

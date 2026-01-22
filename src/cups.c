@@ -33,10 +33,12 @@
 #include "cups.h"
 #include "tc.h"
 
+#include "mbedtls/version.h"
 #include "mbedtls/ecdsa.h"
 #include "mbedtls/error.h"
 #include "mbedtls/sha512.h"
 #include "mbedtls/bignum.h"
+#include "tls.h"
 
 
 #define FAIL_CNT_THRES 6
@@ -63,10 +65,42 @@ static int cups_verifySig (cups_sig_t* sig) {
     int verified = 0;
     dbuf_t key;
     int keyid = -1;
+
+    // Ensure PSA crypto is initialized for mbedtls 3.x ECDSA operations
+    tls_ensurePsaInit();
+
     while ( (key = sys_sigKey(++keyid)).buf != NULL && !verified ) {
         if ( key.bufsize != 64 )
             continue;
 
+#if MBEDTLS_VERSION_NUMBER >= 0x03000000
+        // mbedtls 3.x: ecp_keypair members are now private
+        mbedtls_ecp_group grp;
+        mbedtls_ecp_point Q;
+        mbedtls_ecdsa_context ecdsa;
+        mbedtls_ecp_group_init(&grp);
+        mbedtls_ecp_point_init(&Q);
+        mbedtls_ecdsa_init(&ecdsa);
+
+        // Build uncompressed point format: 04 || X || Y
+        u1_t pubkey[65];
+        pubkey[0] = 0x04;
+        memcpy(pubkey + 1, key.buf, 64);
+
+        int ret;
+        if ((ret = mbedtls_ecp_group_load        (&grp, MBEDTLS_ECP_DP_SECP256R1)                               ) ||
+            (ret = mbedtls_ecp_point_read_binary (&grp, &Q, pubkey, sizeof(pubkey))                             ) ||
+            (ret = mbedtls_ecp_set_public_key    (MBEDTLS_ECP_DP_SECP256R1, &ecdsa, &Q)                         ) ||
+            (ret = mbedtls_ecdsa_read_signature  (&ecdsa, sig->hash, sizeof(sig->hash), sig->signature, sig->len))) {
+            verified = 0;
+        } else {
+            verified = 1;
+        }
+        mbedtls_ecp_group_free(&grp);
+        mbedtls_ecp_point_free(&Q);
+        mbedtls_ecdsa_free(&ecdsa);
+#else
+        // mbedtls 2.x: direct access to ecp_keypair members
         mbedtls_ecp_keypair k;
         mbedtls_ecp_keypair_init(&k);
         mbedtls_ecdsa_context ecdsa;
@@ -86,6 +120,7 @@ static int cups_verifySig (cups_sig_t* sig) {
         }
         mbedtls_ecp_keypair_free(&k);
         mbedtls_ecdsa_free(&ecdsa);
+#endif
 
         LOG(MOD_CUP|INFO, "ECDSA key#%d -> %s", keyid, verified? "VERIFIED" : "NOT verified");
     }
