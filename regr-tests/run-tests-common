@@ -1,0 +1,231 @@
+#!/bin/bash
+
+# --- Revised 3-Clause BSD License ---
+# Copyright Semtech Corporation 2022. All rights reserved.
+#
+# Common test runner library
+# Sourced by category-specific test runners
+
+R=$(echo -e "\033[31m")
+G=$(echo -e "\033[32m")
+B=$(echo -e "\033[34m")
+Y=$(echo -e "\033[33m")
+X=$(echo -e "\033[0m")
+
+# Default variants - can be overridden
+# Note: SX1302 variants (testsim1302, testms1302) will be available after merging add-SF5-SF6 branch
+DEFAULT_VARIANTS="testsim testms"
+
+run_tests() {
+    local verbose=0
+    local nohw=0
+    local forcebuild=0
+    local cleanrun=0
+    local ghactions=0
+    local nobuild=0
+    local variants="$DEFAULT_VARIANTS"
+    local tests="$TESTS"
+    local category="${CATEGORY:-tests}"
+
+    export IGNORE="livecups"
+
+    while [ "$1" != "" ]; do
+        case $1 in
+            -v | --verbose )    verbose=1 ;;
+            -n | --nohw )       export IGNORE="-hw$|$IGNORE" ;;
+            -b | --build )      forcebuild=1 ;;
+            -c | --clean )      cleanrun=1 ;;
+            -g | --ghactions )  ghactions=1 ;;
+            --nobuild )         nobuild=1 ;;
+            --sim )             variants="testsim" ;;
+            --ms )              variants="testms" ;;
+            -V* )               variants="${1#-V}" ;;
+            --variant=* )       variants="${1#--variant=}" ;;
+            --variants=* )      variants="${1#--variants=}" ;;
+            -T* )               tests="${1#-T}" ;;
+            --tests=* )         tests="${1#--tests=}" ;;
+            -h | --help )
+                echo "Usage: $0 [options]"
+                echo "Options:"
+                echo "  -v, --verbose     Show test output"
+                echo "  -n, --nohw        Skip hardware tests"
+                echo "  -b, --build       Force rebuild before tests"
+                echo "  -c, --clean       Clean test state before run"
+                echo "  -g, --ghactions   GitHub Actions output format"
+                echo "  --nobuild         Skip build step (use pre-built binaries)"
+                echo "  --sim             Run only single-slave variant (testsim)"
+                echo "  --ms              Run only multi-slave variant (testms)"
+                echo "  -V<variants>      Specify variants (space-separated)"
+                echo "  --variant=<var>   Specify single variant"
+                echo "  -T<tests>         Specify tests (space-separated)"
+                echo ""
+                echo "Category: $category"
+                echo "Default tests: $tests"
+                echo "Default variants: $variants"
+                return 0
+                ;;
+            *) echo "Illegal argument: $1" >&2; return 1 ;;
+        esac
+        shift
+    done
+
+    cd $(dirname $0)
+
+    local tdir="t.log/$category"
+    mkdir -p "$tdir"
+
+    echo "${Y}=== Running $category tests ===${X}"
+    echo "Tests: $tests"
+    echo "Variants: $variants"
+    echo ""
+
+    # Build variants if needed (unless --nobuild)
+    if [[ $nobuild -eq 0 ]]; then
+        set -e
+        local btarget=""
+        [[ $forcebuild -eq 1 ]] && btarget="deps s-clean s-all"
+        for variant in $variants; do
+            [[ $ghactions -eq 1 ]] && echo "::group::Build $variant"
+            echo "Build $variant"
+            variant=$variant make -C .. $btarget
+            [[ $ghactions -eq 1 ]] && echo "::endgroup::"
+        done
+        set +e
+    fi
+
+    local onego=1
+    local fails=0
+    local passed=0
+    local skipped=0
+    local allok=1
+
+    # Check if previous run had all tests ok
+    for testdir in $tests; do
+        [[ ! -d "$testdir" ]] && continue
+        local rvar=$variants
+        [[ $testdir =~ "-hw" ]] && rvar="hardware"
+        for variant in $rvar; do
+            local test="${testdir}__${variant}"
+            local tfile="$tdir/ok-$test.log"
+            if [ ! -f "$tfile" ]; then
+                allok=0
+                break
+            fi
+        done
+    done
+    
+    if [[ $allok -eq 1 ]] || [[ $cleanrun -eq 1 ]]; then
+        echo "Removing logs of previous test runs."
+        rm -f "$tdir"/*
+    fi
+
+    # Run tests
+    for testdir in $tests; do
+        [[ ! -d "$testdir" ]] && {
+            echo "${Y}Test directory not found: $testdir${X}"
+            continue
+        }
+        
+        local rvar=$variants
+        [[ $testdir =~ "-hw" ]] && rvar="hardware"
+        
+        for variant in $rvar; do
+            local test="${testdir}__${variant}"
+            local tfile="$tdir/fail-$test.log"
+            local tfileOK="$tdir/ok-$test.log"
+            local tfileOFF="$tdir/off-$test.log"
+            
+            if [ -f "$tfileOK" ]; then
+                onego=0
+                echo "${B}Test already passed: $test${X}"
+                ((passed++))
+                continue
+            fi
+            
+            local beg=$(date +%s)
+            
+            if [[ $ghactions -eq 1 ]]; then
+                echo "::group::$test"
+                echo "Running $test"
+            else
+                echo -ne "Running $test...\r"
+            fi
+            
+            set -o pipefail
+            if [[ "$IGNORE" != "" ]] && [[ "$testdir" =~ $IGNORE ]]; then
+                echo "--- Test N/A ---" > "$tfile"
+            elif [[ $verbose -eq 1 ]]; then
+                TEST_VARIANT=$variant make -C "$testdir" 2>&1 | tee "$tfile"
+            else
+                TEST_VARIANT=$variant make -C "$testdir" >"$tfile" 2>&1
+            fi
+            local xcode=$?
+            set +o pipefail
+            
+            [[ $ghactions -eq 1 ]] && echo "::endgroup::"
+            
+            local end=$(date +%s)
+            local mins=$(printf "[%3dsecs]" $(($end-$beg)))
+            
+            if grep -- "--- Test N/A ---" "$tfile" >/dev/null 2>&1; then
+                mv "$tfile" "$tfileOFF"
+                echo "${B}$mins Test n/a:      $test${X}"
+                ((skipped++))
+            elif [ $xcode -eq 0 ]; then
+                mv "$tfile" "$tfileOK"
+                echo "${G}$mins Test passed:   $test${X}"
+                ((passed++))
+            else
+                echo "${R}$mins Test FAILED:   $test${X}"
+                echo "  Details: $tfile"
+                ((fails++))
+            fi
+        done
+    done
+
+    # Summary
+    echo ""
+    echo "${Y}=== $category Summary ===${X}"
+    echo "  Passed:  $passed"
+    echo "  Failed:  $fails"
+    echo "  Skipped: $skipped"
+
+    if [[ $verbose -eq 1 ]]; then
+        echo ""
+        echo "__ Detailed Results _________________________________"
+        for testdir in $tests; do
+            [[ ! -d "$testdir" ]] && continue
+            local rvar=$variants
+            [[ $testdir =~ "-hw" ]] && rvar="hardware"
+            for variant in $rvar; do
+                local test="${testdir}__${variant}"
+                local tfileOK="$tdir/ok-$test.log"
+                local tfileOFF="$tdir/off-$test.log"
+                printf ' %-35s ' "$test"
+                if [ -f "$tfileOK" ]; then
+                    echo "[${G}PASSED${X}]"
+                elif [ -f "$tfileOFF" ]; then
+                    echo "[${B}N/A${X}]"
+                else
+                    echo "[${R}FAILED${X}]"
+                fi
+            done
+        done
+    fi
+
+    if [[ $fails -ne 0 ]]; then
+        echo ""
+        echo "${R}$fails tests failed - check '$tdir/fail-*.log' for details.${X}"
+        return 2
+    fi
+    
+    if [[ $onego -eq 0 ]]; then
+        echo ""
+        echo "${G}All $category tests completed - ${Y}however not in a single run.${X}"
+        return 1
+    fi
+    
+    echo ""
+    echo "${G}All $category tests completed successfully.${X}"
+    return 0
+}

@@ -188,6 +188,16 @@ GPS_EPOCH=datetime(1980,1,6)
 UPC_EPOCH=datetime(1970,1,1)
 UTC_GPS_LEAPS=18
 
+def get_ws_path(ws):
+    """Get websocket path - compatible with websockets 10.x and 16.x"""
+    # websockets 16.x: path is in ws.request.path
+    if hasattr(ws, 'request') and hasattr(ws.request, 'path'):
+        return ws.request.path
+    # websockets 10.x: path is in ws.path
+    if hasattr(ws, 'path'):
+        return ws.path
+    return '/'
+
 class ServerABC:
     def __init__(self, port:int=6000, tlsidentity:Optional[str]=None, tls_no_ca=False):
         self.server = None
@@ -211,7 +221,7 @@ class ServerABC:
     async def start_server(self):
         self.server = await websockets.serve(self.handle_ws, host='0.0.0.0', port=self.port, **self.tlsctx)
 
-    async def handle_ws(self, ws, path):
+    async def handle_ws(self, ws):
         pass
 
 
@@ -226,7 +236,8 @@ class Infos(ServerABC):
         logger.debug("  Starting INFOS (%s/%s) on Port %d (muxsuri=%s)" %(self.homedir, self.tlsidentity or "", self.port, self.muxsuri))
         await super().start_server()
 
-    async def handle_ws(self, ws, path):
+    async def handle_ws(self, ws):
+        path = get_ws_path(ws)
         logger.debug('. INFOS connect: %s from %r' % (path, ws.remote_address))
         try:
             while True:
@@ -266,10 +277,11 @@ class Muxs(ServerABC):
         logger.debug("  Starting MUXS (%s/%s) on Port %d" %(self.homedir, self.tlsidentity or "", self.port))
         await super().start_server()
 
-    async def handle_ws(self, ws, path):
+    async def handle_ws(self, ws):
+        path = get_ws_path(ws)
         logger.debug('. MUXS connect: %s' % (path,))
         if path != '/router':
-            await ws.close(1020)
+            await ws.close(4000)  # Use valid application-specific close code
         self.ws = ws
         rconf = self.get_router_config()
         await ws.send(json.dumps(rconf))

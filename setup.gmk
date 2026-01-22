@@ -87,8 +87,13 @@ CFG.arm-linux-gnueabihf = linux
 # -- Variant specific
 #  testsim runs libloragw inside master process
 #  testms  uses a master slave model
-CFG.testsim = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw
-CFG.testms  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave
+#  testsim1302 - testsim with SF5/SF6 support (simulated SX1302/SX1303)
+#  testms1302 - testms with SF5/SF6 support (master-slave with SX1302/SX1303)
+#  All test variants include 'testing' flag for simplified conditional compilation
+CFG.testsim = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw testing
+CFG.testsim1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw sf5sf6 gps_recovery testing
+CFG.testms  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave testing
+CFG.testms1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave sf5sf6 gps_recovery testing
 CFG.testfs  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw
 CFG.testpin = logini_lvl=INFO tlsdebug ral_lgw testpin
 CFG.std     = logini_lvl=INFO tlsdebug ral_lgw
@@ -132,7 +137,9 @@ CFLAGS.linuxpico.debug = -g -O0
 CFLAGS.corecell.debug = -g -O0
 CFLAGS.linuxpico.debugn = -g -O0
 CFLAGS.linux.testsim  = -g -O0 --coverage
+CFLAGS.linux.testsim1302 = -g -O0 --coverage
 CFLAGS.linux.testms   = -g -O0 --coverage
+CFLAGS.linux.testms1302 = -g -O0 --coverage
 CFLAGS.linux.testfs   = -g -O0 --coverage
 CFLAGS.linux.testpin  = -g -O3
 CFLAGS.linux.std      = -g -O3

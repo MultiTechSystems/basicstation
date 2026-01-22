@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # --- Revised 3-Clause BSD License ---
 # Copyright Semtech Corporation 2022. All rights reserved.
 #
@@ -26,65 +24,10 @@
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-function cleanup () {
-    default_cleanup
-    echo "Extra cleanup.."
-    rm -f tc.{crt,key,trust}
-}
+all:
+	./test.sh
 
-. ../testlib.sh
+clean:
+	rm -f $$(cat .gitignore)
 
-# radioinit args - testms variants pass slave index as extra arg
-if [[ "$TEST_VARIANT" == testms* ]]; then
-    riargs="./spidev 0"
-else
-    riargs="./spidev"
-fi
-
-# Plain TCP/ws
-unset STATION_ARGS
-unset STATION_RADIOINIT
-python test.py
-banner TCP/ws done
-collect_gcda _tcp_ws
-
-expect="1 ./spidev radioinit1.sh $riargs"
-if [[ "$(cat radioinit.args)" != "$expect" ]]; then
-    echo "radioinit1.sh failed"
-    echo " ----------> $(cat radioinit.args)"
-    echo "         vs> $expect"
-    exit 1
-fi
-
-# Plain TLS/wss no client auth
-export STATION_ARGS="-i radioinit2.sh"
-ln -s ../pki-data/muxs-0.ca tc.trust
-python test.py tls no_ca
-banner TLS/wss no client auth done
-collect_gcda _tls_no_ca
-unset STATION_ARGS
-
-expect="2 ./spidev radioinit2.sh $riargs"
-if [[ "$(cat radioinit.args)" != "$expect" ]]; then
-    echo "radioinit2.sh failed"
-    echo " ----------> $(cat radioinit.args)"
-    echo "         vs> $expect"
-    exit 1
-fi
-
-# Plain TLS/wss with client auth
-export STATION_RADIOINIT="radioinit3.sh"
-ln -s ../pki-data/tc-router-1.key tc.key
-ln -s ../pki-data/tc-router-1.crt tc.crt
-python test.py tls
-banner TLS/wss with client auth done
-collect_gcda _tls_ca
-unset STATION_RADIOINIT
-
-expect="3 ./spidev radioinit3.sh $riargs"
-if [[ "$(cat radioinit.args)" != "$expect" ]]; then
-    echo "radioinit3.sh failed"
-    echo " --------------> $(cat radioinit.args)"
-    echo "             vs> $expect"
-    exit 1
-fi
+.PHONY: all clean

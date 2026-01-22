@@ -26,65 +26,22 @@
 # OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-function cleanup () {
-    default_cleanup
-    echo "Extra cleanup.."
-    rm -f tc.{crt,key,trust}
-}
-
 . ../testlib.sh
 
-# radioinit args - testms variants pass slave index as extra arg
-if [[ "$TEST_VARIANT" == testms* ]]; then
-    riargs="./spidev 0"
-else
-    riargs="./spidev"
+# This test only runs on 1302 variants which have GPS recovery support
+if [[ "$TEST_VARIANT" != *1302* ]]; then
+    echo "Skipping test - GPS recovery only available on 1302 variants"
+    exit 0
 fi
 
-# Plain TCP/ws
-unset STATION_ARGS
-unset STATION_RADIOINIT
-python test.py
-banner TCP/ws done
-collect_gcda _tcp_ws
+[[ -p gps.fifo ]] || mkfifo gps.fifo
+[[ -p cmd.fifo ]] || mkfifo cmd.fifo
 
-expect="1 ./spidev radioinit1.sh $riargs"
-if [[ "$(cat radioinit.args)" != "$expect" ]]; then
-    echo "radioinit1.sh failed"
-    echo " ----------> $(cat radioinit.args)"
-    echo "         vs> $expect"
-    exit 1
-fi
+# Set short thresholds for testing
+export NO_PPS_RESET_THRES=10
+export NO_PPS_RESET_FAIL_THRES=3
 
-# Plain TLS/wss no client auth
-export STATION_ARGS="-i radioinit2.sh"
-ln -s ../pki-data/muxs-0.ca tc.trust
-python test.py tls no_ca
-banner TLS/wss no client auth done
-collect_gcda _tls_no_ca
-unset STATION_ARGS
+# Run the test
+python3 test.py
 
-expect="2 ./spidev radioinit2.sh $riargs"
-if [[ "$(cat radioinit.args)" != "$expect" ]]; then
-    echo "radioinit2.sh failed"
-    echo " ----------> $(cat radioinit.args)"
-    echo "         vs> $expect"
-    exit 1
-fi
-
-# Plain TLS/wss with client auth
-export STATION_RADIOINIT="radioinit3.sh"
-ln -s ../pki-data/tc-router-1.key tc.key
-ln -s ../pki-data/tc-router-1.crt tc.crt
-python test.py tls
-banner TLS/wss with client auth done
-collect_gcda _tls_ca
-unset STATION_RADIOINIT
-
-expect="3 ./spidev radioinit3.sh $riargs"
-if [[ "$(cat radioinit.args)" != "$expect" ]]; then
-    echo "radioinit3.sh failed"
-    echo " --------------> $(cat radioinit.args)"
-    echo "             vs> $expect"
-    exit 1
-fi
+collect_gcda
