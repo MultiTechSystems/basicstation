@@ -34,8 +34,8 @@ function cleanup () {
 
 . ../testlib.sh
 
-# radioinit args
-if [[ "$TEST_VARIANT" = "testms" ]]; then
+# radioinit args - testms variants pass slave index as extra arg
+if [[ "$TEST_VARIANT" == testms* ]]; then
     riargs="./spidev 0"
 else
     riargs="./spidev"
