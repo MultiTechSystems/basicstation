@@ -74,6 +74,7 @@ no_gps_capture
 ontime
 pa_gain
 pdu
+pdu_only
 preamble
 priority
 pps

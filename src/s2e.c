@@ -38,6 +38,7 @@
 u1_t s2e_dcDisabled;    // no duty cycle limits - override for test/dev
 u1_t s2e_ccaDisabled;   // no LBT etc           - ditto
 u1_t s2e_dwellDisabled; // no dwell time limits - ditto
+u1_t s2e_pduOnly;       // send raw PDU instead of parsed LoRaWAN fields
 
 
 extern inline int   rps_sf   (rps_t params);
@@ -160,10 +161,19 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
                     j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime);
 
         uj_encOpen(&sendbuf, '{');
-        if( !s2e_parse_lora_frame(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len, lbuf.buf ? &lbuf : NULL) ) {
-            // Frame failed sanity checks or stopped by filters
-            sendbuf.pos = 0;
-            continue;
+        if( s2e_pduOnly ) {
+            // PDU-only mode: send raw frame without parsing into LoRaWAN fields
+            uj_encKVn(&sendbuf,
+                      "msgtype", 's', "updf",
+                      "pdu",     'H', j->len, &s2ctx->rxq.rxdata[j->off],
+                      NULL);
+            xprintf(&lbuf, "pdu-only %d bytes", j->len);
+        } else {
+            if( !s2e_parse_lora_frame(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len, lbuf.buf ? &lbuf : NULL) ) {
+                // Frame failed sanity checks or stopped by filters
+                sendbuf.pos = 0;
+                continue;
+            }
         }
         if( lbuf.buf )
             log_specialFlush(lbuf.pos);
@@ -1083,6 +1093,11 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             break;
         }
 #endif // !defined(CFG_prod)
+        case J_pdu_only: {
+            s2e_pduOnly = uj_bool(D) ? 1 : 0;
+            LOG(MOD_S2E|INFO, "PDU-only mode %s", s2e_pduOnly ? "enabled" : "disabled");
+            break;
+        }
         case J_sx1301_conf:
         case J_SX1301_conf:
         case J_sx1302_conf:
