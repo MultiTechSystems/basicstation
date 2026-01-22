@@ -34,7 +34,7 @@ X=$(echo -e "\033[0m")
 cd $(dirname $0)
 
 mkdir -p t.log
-variants="testsim testms"
+variants="testsim testsim1302 testms testms1302"
 tests="$(echo test[0-9]*-*)"
 
 verbose=0
@@ -42,6 +42,7 @@ nohw=0
 forcebuild=0
 cleanrun=0
 ghactions=0
+nobuild=0
 
 export IGNORE="livecups"
 
@@ -52,6 +53,8 @@ while [ "$1" != "" ]; do
         -b | --build )   forcebuild=1 ;;
         -c | --clean )   cleanrun=1   ;;
         -g | --ghactions )  ghactions=1     ;;
+        --nobuild )      nobuild=1    ;;
+        --variant=* )    variants="${1#--variant=}";;
         -T* )        tests="${1#-T}";;
         --tests=* )  tests="${1#--tests=}";;
         *) echo "Illegal argument: $1" >&2; exit 1;;
@@ -62,13 +65,15 @@ done
 set -e
 btarget=""
 [[ $forcebuild -eq 1 ]] && btarget="deps s-clean s-all"
-# Make sure variants are up-to-date
-for variant in $variants; do
-    [[ $ghactions -eq 1 ]] && echo "::group::Build $variant"
-    echo "Build $variant"
-    variant=$variant make -C .. $btarget
-    [[ $ghactions -eq 1 ]] && echo "::endgroup::"
-done
+# Make sure variants are up-to-date (unless --nobuild)
+if [[ $nobuild -eq 0 ]]; then
+    for variant in $variants; do
+        [[ $ghactions -eq 1 ]] && echo "::group::Build $variant"
+        echo "Build $variant"
+        variant=$variant make -C .. $btarget
+        [[ $ghactions -eq 1 ]] && echo "::endgroup::"
+    done
+fi
 set +e
 
 
