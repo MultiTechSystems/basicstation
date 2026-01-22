@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# --- Revised 3-Clause BSD License ---
+# Copyright Semtech Corporation 2022. All rights reserved.
+#
+# PPS/GPS timing tests
+# These tests verify GPS and PPS synchronization functionality
+
+. $(dirname $0)/run-tests-common
+
+TESTS="test2-gps test2-pps test2-pps-multislave test2-nopps-multislave"
+CATEGORY="pps"
+
+run_tests "$@"

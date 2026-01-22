@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# --- Revised 3-Clause BSD License ---
+# Copyright Semtech Corporation 2022. All rights reserved.
+#
+# Master test runner - runs all test categories
+
+R=$(echo -e "\033[31m")
+G=$(echo -e "\033[32m")
+B=$(echo -e "\033[34m")
+Y=$(echo -e "\033[33m")
+X=$(echo -e "\033[0m")
+
+cd $(dirname $0)
+
+CATEGORIES="core tls-cups updn pps"
+ARGS="$@"
+TOTAL_FAILS=0
+
+echo "${Y}========================================${X}"
+echo "${Y}  Running All Regression Test Categories${X}"
+echo "${Y}========================================${X}"
+echo ""
+
+for cat in $CATEGORIES; do
+    runner="./run-tests-$cat"
+    if [[ -x "$runner" ]]; then
+        echo "${Y}>>> Starting $cat tests <<<${X}"
+        $runner $ARGS
+        result=$?
+        if [[ $result -ne 0 ]]; then
+            ((TOTAL_FAILS++))
+            echo "${R}>>> $cat tests had failures <<<${X}"
+        else
+            echo "${G}>>> $cat tests completed <<<${X}"
+        fi
+        echo ""
+    else
+        echo "${R}Runner not found: $runner${X}"
+        ((TOTAL_FAILS++))
+    fi
+done
+
+echo "${Y}========================================${X}"
+echo "${Y}  Final Summary${X}"
+echo "${Y}========================================${X}"
+
+if [[ $TOTAL_FAILS -eq 0 ]]; then
+    echo "${G}All test categories passed!${X}"
+    exit 0
+else
+    echo "${R}$TOTAL_FAILS test category(ies) had failures${X}"
+    exit 1
+fi
