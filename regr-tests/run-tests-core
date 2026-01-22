@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# --- Revised 3-Clause BSD License ---
+# Copyright Semtech Corporation 2022. All rights reserved.
+#
+# Core/Infrastructure tests: selftests, filesystem, respawn
+# These tests verify basic station functionality
+
+. $(dirname $0)/run-tests-common
+
+TESTS="test1-selftests test2-fs test7-respawn"
+CATEGORY="core"
+
+run_tests "$@"
