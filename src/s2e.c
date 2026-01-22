@@ -125,7 +125,23 @@ void s2e_addRxjob (s2ctx_t* s2ctx, rxjob_t* rxjob) {
             memcmp(&s2ctx->rxq.rxdata[p->off], &s2ctx->rxq.rxdata[rxjob->off], rxjob->len) == 0 ) {
             // Duplicate detected - drop the mirror
             if( (8*rxjob->snr - rxjob->rssi) > (8*p->snr - p->rssi) ) {
-                // Drop previous frame p
+
+                if (p->fts > -1) {
+                    // Copy a fine timestamp previous mirror frame if it missing.
+                    // This can happen if the frame was received via multiple modems at the same time and the (fine) timestamp flag is not set on the other modem?
+                    //
+                    // SX1303 Datasheet Rev 1.2 DS.SX1303.W.APP, Oct 2020 - 7. Detection Engine - Modems
+                    //      Timestamp for all Spreading Factors:
+                    //      Up to 8 packets at Spreading Factor SF5-12 can be received at any time, including, at most, 4 packets at SF11 and/or SF12.
+                    //      All these packets will be timestamped.
+
+                    if (rxjob->fts == -1) {
+                        LOG(MOD_S2E|DEBUG, "Copy the fine timestamp [%d] of the previous mirror frame before drop it.", p->fts);
+                        rxjob->fts = p->fts;
+                    }
+                }
+
+                // Drop previous frame
                 LOG(MOD_S2E|DEBUG, "Dropped mirror frame freq=%F snr=%5.1f rssi=%d (vs. freq=%F snr=%5.1f rssi=%d) - DR%d mic=%d (%d bytes)",
                     p->freq, p->snr/4.0, -p->rssi, rxjob->freq, rxjob->snr/4.0, -rxjob->rssi,
                     p->dr, (s4_t)rt_rlsbf4(&s2ctx->rxq.rxdata[p->off]+rxjob->len-4), p->len);
@@ -156,8 +172,8 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
         rxjob_t* j = &s2ctx->rxq.rxjobs[s2ctx->rxq.first++];
         dbuf_t lbuf = { .buf = NULL };
         if( log_special(MOD_S2E|VERBOSE, &lbuf) )
-            xprintf(&lbuf, "RX %F DR%d %R snr=%.1f rssi=%d xtime=0x%lX - ",
-                    j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime);
+            xprintf(&lbuf, "RX %F DR%d %R snr=%.1f rssi=%d xtime=0x%lX fts=%d - ",
+                    j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime, j->fts);
 
         uj_encOpen(&sendbuf, '{');
         if( !s2e_parse_lora_frame(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len, lbuf.buf ? &lbuf : NULL) ) {
@@ -206,9 +222,12 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
 
 
 static const u2_t DC_EU868BAND_RATE[] = {
-    [DC_DECI ]=   10,
-    [DC_CENTI]=  100,
-    [DC_MILLI]= 1000,
+    [DC_BAND_K]= 1000,
+    [DC_BAND_L]=  100,
+    [DC_BAND_M]=  100,
+    [DC_BAND_N]= 1000,
+    [DC_BAND_P]=   10,
+    [DC_BAND_Q]=  100,
 };
 
 
@@ -226,7 +245,7 @@ static ustime_t _calcAirTime (rps_t rps, u1_t plen, u1_t nocrc, u2_t preamble) {
     }
     sf = 7 + (sf - SF7)*(SF8-SF7); // map enums SF7..SF12 to 7..12
     u1_t sfx = 4*sf;
-    u1_t q = sfx - (sf >= 11 && bw == 0 ? 8 : 0);  
+    u1_t q = sfx - (sf >= 11 && bw == 0 ? 8 : 0);
     u1_t ih = 0;     // station never sends with implicit header
     u1_t cr = 0;     // CR_4_5=0, CR_4_6, CR_4_7, CR_4_8
     int tmp = 8*plen - sfx + 28 + (nocrc?0:16) - (ih?20:0);
@@ -329,7 +348,7 @@ static void check_dnfreq (s2ctx_t* s2ctx, ujdec_t* ujd, u4_t* pfreq, u1_t* pchnl
     *pfreq = freq;
     // Find and assign a DN channel to this freq.
     // This channel index is only used locally to tracking duty cycle
-    
+
     int ch;
     for( ch=0; ch<MAX_DNCHNLS; ch++ ) {
         if( s2ctx->dn_chnls[ch] == 0 )
@@ -357,15 +376,39 @@ static void check_dr (s2ctx_t* s2ctx, ujdec_t* ujd, u1_t* pdr) {
     *pdr = dr;
 }
 
+
+
 static int freq2band (u4_t freq) {
-    if( freq >= 869400000 && freq <= 869650000 )
-        return DC_DECI;
-    if( (freq >= 868000000 && freq <= 868600000) || (freq >= 869700000 && freq <= 870000000) )
-        return DC_CENTI;
-    return DC_MILLI;
+
+    if (freq >= 863000000 && freq <= 865000000 )
+        return DC_BAND_K;
+
+    if (freq >= 865000000 && freq <= 868000000 )
+        return DC_BAND_L;
+
+    if (freq >= 868000000 && freq <= 868600000)
+        return DC_BAND_M;
+
+    if (freq >= 868700000 && freq <= 869200000 )
+        return DC_BAND_N;
+
+    if (freq >= 869400000 && freq <= 869650000 )
+        return DC_BAND_P;
+
+    if (freq >= 869700000 && freq <= 870000000)
+        return DC_BAND_Q;
+
+    return DC_BAND_K;
 }
 
+char EU_BAND_NAMES[] = { 'K', 'L', 'M', 'N', 'P', 'Q' };
+
 static void update_DC (s2ctx_t* s2ctx, txjob_t* txj) {
+    if (s2e_dcDisabled) {
+        LOG(MOD_S2E|XDEBUG, "DC limits disabled, transmissions regulated by the LNS");
+        return;
+    }
+
     if( s2ctx->region == J_EU868 ) {
         u1_t band = freq2band(txj->freq);
         ustime_t* dcbands = s2ctx->txunits[txj->txunit].dc_eu868bands;
@@ -373,10 +416,11 @@ static void update_DC (s2ctx_t* s2ctx, txjob_t* txj) {
         // Update unless disabled or blocked
         if( t != USTIME_MIN && t != USTIME_MAX ) {
             dcbands[band] = t = txj->txtime + txj->airtime * DC_EU868BAND_RATE[band];
-            LOG(MOD_S2E|XDEBUG, "DC EU band %d blocked until %>.3T (txtime=%>.3T airtime=%~T)",
-                DC_EU868BAND_RATE[band], rt_ustime2utc(t), rt_ustime2utc(txj->txtime), (ustime_t)txj->airtime);
+            LOG(MOD_S2E|XDEBUG, "DC EU band %c (x%d) blocked until %>.3T (txtime=%>.3T airtime=%~T)",
+                EU_BAND_NAMES[band], DC_EU868BAND_RATE[band], rt_ustime2utc(t), rt_ustime2utc(txj->txtime), (ustime_t)txj->airtime);
         }
     }
+
     int dnchnl = txj->dnchnl;
     ustime_t* dclist = s2ctx->txunits[txj->txunit].dc_perChnl;
     ustime_t t = dclist[dnchnl];
@@ -478,7 +522,7 @@ static int s2e_canTxEU868 (s2ctx_t* s2ctx, txjob_t* txjob, int* ccaDisabled) {
     ustime_t txtime = txjob->txtime;
     ustime_t band_exp = s2ctx->txunits[txjob->txunit].dc_eu868bands[freq2band(txjob->freq)];
     if( txtime >= band_exp ) {
-        
+
         return 1;   // clear channel analysis not required
     }
     // No DC in band
@@ -533,7 +577,7 @@ int s2e_addTxjob (s2ctx_t* s2ctx, txjob_t* txjob, int relocate, ustime_t now) {
         }
 
         if( txtime < earliest  &&  !altTxTime(s2ctx, txjob, earliest) )
-            
+
             return 0;
         goto start;
     }
@@ -543,7 +587,7 @@ int s2e_addTxjob (s2ctx_t* s2ctx, txjob_t* txjob, int relocate, ustime_t now) {
             // No more alternative antennas - try later TX time
             if( !altTxTime(s2ctx, txjob, earliest) ) {
                 LOG(MOD_S2E|WARNING, "%J - unable to place frame", txjob);
-                
+
                 return 0;
             }
             // and reset antenna options
@@ -642,13 +686,6 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
             }
             // Looks like it's on air
             update_DC(s2ctx, curr);
-            
-            
-            
-            
-            
-            
-            
 
             curr->txflags |= TXFLAG_TXCHECKED;
             // sending dntxed here instead @txend gives nwks more time to update/inform muxs (join)
@@ -966,7 +1003,7 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                 uj_exitArray(D);
                 jlistlen = min(off, MAX_JOINEUI_RANGES);
                 s2e_joineuiFilter[2*jlistlen] = 0; // terminate list
-                
+
             }
             break;
         }
@@ -988,6 +1025,10 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                 resetDC(s2ctx, 3600/100);  // 100s / 1h cummulative on time under PSA = ~2.78%
                 break;
             }
+            case J_IN865: {
+                s2ctx->txpow = 30 * TXPOW_SCALE;
+                break;
+            }
             case J_IL915: {
                 s2ctx->txpow  = 14 * TXPOW_SCALE;
                 s2ctx->txpow2 = 20 * TXPOW_SCALE;
@@ -1003,15 +1044,43 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                 resetDC(s2ctx, 50);      // 2%
                 break;
             }
+            case J_AS923: // non-std obsolete naming
             case J_AS923JP: { // non-std obsolete naming
                 region = J_AS923_1;
                 region_s = "AS923-1";
                 // FALL THRU
             }
-            case J_AS923_1: { // common region name
+            case J_AS923_1:{ // common region name
                 s2ctx->ccaEnabled = 1;
                 s2ctx->canTx = s2e_canTxPerChnlDC;
-                s2ctx->txpow = 13 * TXPOW_SCALE;
+                s2ctx->txpow = 16 * TXPOW_SCALE;
+                resetDC(s2ctx, 10);      // 10%
+                break;
+            }
+            case J_AS923_2: {
+                region = J_AS923_2;
+                region_s = "AS923-2";
+                s2ctx->ccaEnabled = 1;
+                s2ctx->canTx = s2e_canTxPerChnlDC;
+                s2ctx->txpow = 16 * TXPOW_SCALE;
+                resetDC(s2ctx, 10);      // 10%
+                break;
+            }
+            case J_AS923_3: {
+                region = J_AS923_3;
+                region_s = "AS923-3";
+                s2ctx->ccaEnabled = 1;
+                s2ctx->canTx = s2e_canTxPerChnlDC;
+                s2ctx->txpow = 16 * TXPOW_SCALE;
+                resetDC(s2ctx, 10);      // 10%
+                break;
+            }
+            case J_AS923_4: {
+                region = J_AS923_4;
+                region_s = "AS923-4";
+                s2ctx->ccaEnabled = 1;
+                s2ctx->canTx = s2e_canTxPerChnlDC;
+                s2ctx->txpow = 16 * TXPOW_SCALE;
                 resetDC(s2ctx, 10);      // 10%
                 break;
             }
@@ -1021,7 +1090,12 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                 // FALL THRU
             }
             case J_US915: { // common region name
-                s2ctx->txpow = 26 * TXPOW_SCALE;
+                // US915 fcc allows 36dBm EIRP  30 dBm conducted power upto +6 dBi antenna gain
+                // should be 30 + antenna gain, but we don't know the antenna gain in this section
+                // the radio can't emit over 30dBm, so we set it to 36dBm to work with any antenna
+                // the gain is subtracted in the radio layer before sending, this will allow maximum power
+                // to be used for any antenna                
+                s2ctx->txpow = 36 * TXPOW_SCALE;
                 break;
             }
             case J_AU915: {
@@ -1057,15 +1131,17 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             break;
         }
 #if defined(CFG_prod)
-        case J_nocca:
-        case J_nodc:
-        case J_nodwell:
         case J_device_mode: {
             LOG(MOD_S2E|WARNING, "Feature not supported in production level code (router_config) - ignored: %s", D->field.name);
             uj_skipValue(D);
             break;
         }
 #else // !defined(CFG_prod)
+        case J_device_mode: {
+            sys_deviceMode = uj_bool(D) ? 1 : 0;
+            break;
+        }
+#endif // !defined(CFG_prod)
         case J_nocca: {
             ccaDisabled = uj_bool(D) ? 2 : 1;
             break;
@@ -1078,11 +1154,6 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             dwellDisabled = uj_bool(D) ? 2 : 1;
             break;
         }
-        case J_device_mode: {
-            sys_deviceMode = uj_bool(D) ? 1 : 0;
-            break;
-        }
-#endif // !defined(CFG_prod)
         case J_sx1301_conf:
         case J_SX1301_conf:
         case J_sx1302_conf:
@@ -1791,7 +1862,7 @@ int s2e_onMsg (s2ctx_t* s2ctx, char* json, ujoff_t jsonlen) {
         LOG(MOD_S2E|ERROR, "Parsing of JSON message failed - ignored");
         return 1;   // return fail? would trigger a reconnect
     }
-    if( s2ctx->region == 0 && (msgtype == J_dnmsg || msgtype == J_dnsched || msgtype == J_dnframe) ) {
+    if( s2ctx->txpow == 0 && (msgtype == J_dnmsg || msgtype == J_dnsched || msgtype == J_dnframe) ) {
         // Might happen if messages are still queued
         LOG(MOD_S2E|WARNING, "Received '%.*s' before 'router_config' - dropped", D.str.len, D.str.beg);
         return 1;

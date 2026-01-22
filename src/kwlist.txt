@@ -5,6 +5,9 @@ api
 arguments
 AS923
 AS923-1
+AS923-2
+AS923-3
+AS923-4
 AS923JP
 asap
 AU915
@@ -51,6 +54,7 @@ hello
 hwspec
 if
 IL915
+IN865
 infos_uri
 JoinEui
 JoinEUI
