@@ -1,5 +1,3 @@
-# Test for duty_cycle_enabled router_config option
-
 all:
 	./test.sh
 

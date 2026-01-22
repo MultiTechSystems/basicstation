@@ -692,9 +692,16 @@ def on_station_version(msg):
    - 1+ hour test verifying window slides correctly
    - Old transmissions properly expire
 
-3. **Multi-band**
-   - Each band tracked independently
+3. **Multi-band (EU868)**
+   - Each band (K/L/M/N/P/Q) tracked independently
    - No cross-band interference
+   - Transmitting in one band doesn't affect another band's budget
+   - Test: Send on 10% band, 1% band, 0.1% band in sequence
+
+4. **Multi-channel (AS923/KR920)**
+   - Each channel tracked independently for per-channel DC regions
+   - Transmitting on one channel doesn't affect another channel's budget
+   - Test: Cycle through channels to maximize throughput
 
 ### Regression Tests
 
