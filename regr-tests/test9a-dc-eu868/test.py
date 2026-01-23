@@ -40,9 +40,9 @@ sim = None
 test_result = None
 
 # EU868 DC band frequencies
-BAND_DECI  = 869525000   # 10% DC band (869.4-869.65 MHz)
-BAND_CENTI = 868100000   # 1% DC band (868.0-868.6 MHz)
-BAND_MILLI = 867100000   # 0.1% DC band
+BAND_DECI  = 869525000   # 10% DC band P (869.4-869.65 MHz)
+BAND_CENTI = 868100000   # 1% DC band M (868.0-868.6 MHz)
+BAND_MILLI = 864100000   # 0.1% DC band K (863-865 MHz)
 
 # DC rates (multiplier on airtime for off-time)
 # 10% = 10x, 1% = 100x, 0.1% = 1000x

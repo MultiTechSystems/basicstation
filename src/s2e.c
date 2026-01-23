@@ -75,11 +75,21 @@ static void resetDC (s2ctx_t* s2ctx, u2_t dc_chnlRate) {
 static u1_t dc_mode = DC_MODE_LEGACY;              // Default to legacy for backward compat
 static ustime_t dc_window_us = (ustime_t)DC_DEFAULT_WINDOW_SECS * 1000000ULL;
 
-// Band-based limits in permille (EU868 defaults)
+// EU868 band-based limits in permille
+// Indexed by DC_BAND_K through DC_BAND_Q
+// K (863-865 MHz): 0.1%
+// L (865-868 MHz): 1%
+// M (868-868.6 MHz): 1%
+// N (868.7-869.2 MHz): 0.1%
+// P (869.4-869.65 MHz): 10%
+// Q (869.7-870 MHz): 1%
 static u2_t dc_band_limits_permille[DC_NUM_BANDS] = {
-    [DC_DECI ] = 100,   // 10%  = 100 permille
-    [DC_CENTI] = 10,    // 1%   = 10 permille
-    [DC_MILLI] = 1,     // 0.1% = 1 permille
+    [DC_BAND_K] = 1,    // 0.1% = 1 permille
+    [DC_BAND_L] = 10,   // 1%   = 10 permille
+    [DC_BAND_M] = 10,   // 1%   = 10 permille
+    [DC_BAND_N] = 1,    // 0.1% = 1 permille
+    [DC_BAND_P] = 100,  // 10%  = 100 permille
+    [DC_BAND_Q] = 10,   // 1%   = 10 permille
 };
 
 // Channel-based limit (AS923, IN865)
@@ -118,6 +128,7 @@ static u4_t dc_cumulative(dc_history_t* h, ustime_t window_start) {
 static u2_t dc_get_limit(s2ctx_t* s2ctx, txjob_t* txjob) {
     switch (dc_mode) {
         case DC_MODE_BAND:
+            // EU868 band-based limit (K-Q bands)
             return dc_band_limits_permille[freq2band(txjob->freq)];
         
         case DC_MODE_CHANNEL:
@@ -1449,19 +1460,21 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
                     ujcrc_t band;
                     while( (band = uj_nextField(D)) != 0 ) {
                         int limit = uj_intRange(D, 1, 1000);
-                        // Map band name to index (K=0.1%, L=1%, M=1%, N=0.1%, P=10%, Q=1%)
-                        // For simplified model: DECI=10%, CENTI=1%, MILLI=0.1%
-                        // Band names map to these based on frequency
-                        if( band == J_P ) dc_band_limits_permille[DC_DECI] = limit;
-                        else if( band == J_L || band == J_M || band == J_Q )
-                            dc_band_limits_permille[DC_CENTI] = limit;
-                        else if( band == J_K || band == J_N )
-                            dc_band_limits_permille[DC_MILLI] = limit;
+                        // Map band name to band index (K-Q)
+                        if( band == J_K ) dc_band_limits_permille[DC_BAND_K] = limit;
+                        else if( band == J_L ) dc_band_limits_permille[DC_BAND_L] = limit;
+                        else if( band == J_M ) dc_band_limits_permille[DC_BAND_M] = limit;
+                        else if( band == J_N ) dc_band_limits_permille[DC_BAND_N] = limit;
+                        else if( band == J_P ) dc_band_limits_permille[DC_BAND_P] = limit;
+                        else if( band == J_Q ) dc_band_limits_permille[DC_BAND_Q] = limit;
                     }
-                    LOG(MOD_S2E|INFO, "Duty cycle band limits: 10%%=%u, 1%%=%u, 0.1%%=%u permille",
-                        dc_band_limits_permille[DC_DECI],
-                        dc_band_limits_permille[DC_CENTI],
-                        dc_band_limits_permille[DC_MILLI]);
+                    LOG(MOD_S2E|INFO, "Duty cycle band limits: K=%u L=%u M=%u N=%u P=%u Q=%u permille",
+                        dc_band_limits_permille[DC_BAND_K],
+                        dc_band_limits_permille[DC_BAND_L],
+                        dc_band_limits_permille[DC_BAND_M],
+                        dc_band_limits_permille[DC_BAND_N],
+                        dc_band_limits_permille[DC_BAND_P],
+                        dc_band_limits_permille[DC_BAND_Q]);
                 }
             } else if( dc_mode == DC_MODE_CHANNEL ) {
                 // Single integer value (permille)
