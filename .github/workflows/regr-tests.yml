@@ -139,7 +139,9 @@ jobs:
           info_files=$(find coverage -name '*.info' -type f 2>/dev/null)
           if [ -n "$info_files" ]; then
             lcov -t "s2core" $(for f in $info_files; do echo "-a $f"; done) -o s2core.info
-            genhtml s2core.info -o s2core-html
+            # Remove any entries for non-existent source files (e.g., srctype)
+            lcov --remove s2core.info '*/srctype' -o s2core.info || true
+            genhtml s2core.info -o s2core-html --ignore-errors source
           else
             echo "No coverage files found"
             mkdir -p s2core-html
