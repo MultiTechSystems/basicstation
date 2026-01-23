@@ -37,6 +37,7 @@
 // Mock declaration for simulation builds
 int sx1302_gps_enable(int enable);
 #else
+#include "lgw/loragw_hal.h"
 #include "lgw/loragw_sx1302.h"
 #endif
 #endif
