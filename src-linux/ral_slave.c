@@ -261,7 +261,7 @@ static void pipe_read (aio_t* aio) {
                 if( (status = !sx130xconf_parse_setup(&sx1301conf, sys_slaveIdx, confreq->hwspec, confreq->json, confreq->jsonlen)) ||
                     (status = !sx130xconf_challoc(&sx1301conf, &confreq->upchs)   << 1) ||
                     (status = !sys_runRadioInit(sx1301conf.device)                << 2) ||
-                    (status = !sx130xconf_start(&sx1301conf, confreq->region)     << 3) )
+                    (status = !sx130xconf_start(&sx1301conf, confreq->region, NULL) << 3) )
                     rt_fatal("Slave radio start up failed with status 0x%02x", status);
                 if( sx1301conf.pps && sys_slaveIdx ) {
                     LOG(MOD_RAL|ERROR, "Only slave#0 may have PPS enabled");

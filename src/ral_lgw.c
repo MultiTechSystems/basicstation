@@ -45,17 +45,6 @@
 extern timestamp_counter_t counter_us; // from loragw_sx1302.c
 #endif // defined(CFG_sx1302)
 
-// Define SF5/SF6 datarate values for simulation or SX1302 HAL
-// CFG_sf5sf6 enables SF5/SF6 in testsim without full SX1302 HAL
-#if defined(CFG_sx1302) || defined(CFG_sf5sf6)
-#ifndef DR_LORA_SF5
-#define DR_LORA_SF5     0x05
-#endif
-#ifndef DR_LORA_SF6
-#define DR_LORA_SF6     0x06
-#endif
-#endif
-
 #define RAL_MAX_RXBURST 10
 
 #define FSK_BAUD      50000
@@ -69,10 +58,6 @@ static const u2_t SF_MAP[] = {
     [SF9  ]= DR_LORA_SF9,
     [SF8  ]= DR_LORA_SF8,
     [SF7  ]= DR_LORA_SF7,
-#if defined(CFG_sx1302) || defined(CFG_sf5sf6)
-    [SF6  ]= DR_LORA_SF6,
-    [SF5  ]= DR_LORA_SF5,
-#endif
     [FSK  ]= DR_UNDEFINED,
     [SFNIL]= DR_UNDEFINED,
 };
@@ -371,7 +356,7 @@ static void rxpolling (tmr_t* tmr) {
 }
 
 
-int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs) {
+int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs, lbt_config_t* lbt_config) {
     if( strcmp(hwspec, "sx1301/1") != 0 ) {
         LOG(MOD_RAL|ERROR, "Unsupported hwspec=%s", hwspec);
         return 0;
@@ -397,7 +382,7 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
             if( (status = !sx130xconf_parse_setup(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 0) ||
                 (status = !sx130xconf_challoc(&sx130xconf, upchs)    << 1) ||
                 (status = !sys_runRadioInit(sx130xconf.device)       << 2) ||
-                (status = !sx130xconf_start(&sx130xconf, cca_region) << 3) ) {
+                (status = !sx130xconf_start(&sx130xconf, cca_region, lbt_config) << 3) ) {
                 LOG(MOD_RAL|ERROR, "ral_config failed with status 0x%02x", status);
             } else {
                 // Radio started

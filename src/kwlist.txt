@@ -139,6 +139,13 @@ web_port
 web_dir
 xtime
 # ----------------------------------------
+# LBT configuration from router_config
+lbt_enabled
+lbt_channels
+lbt_rssi_target
+lbt_rssi_offset
+lbt_scan_time_us
+# ----------------------------------------
 # sx1301 conf
 bandwidth
 chan_FSK

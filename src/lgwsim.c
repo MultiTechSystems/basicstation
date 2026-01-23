@@ -51,6 +51,7 @@
 #include "rt.h"
 #include "s2e.h"
 #include "sys.h"
+#include "sx130xconf.h"
 
 #include "sys_linux.h"
 
@@ -599,6 +600,16 @@ int lgw_lbt_setconf (struct lgw_conf_lbt_s conf) {
     return LGW_HAL_SUCCESS;
 }
 
+#if defined(CFG_sx1302)
+int lgw_sx1261_setconf (struct lgw_conf_sx1261_s *conf) {
+    if (conf && conf->enable) {
+        LOG(MOD_RAL|INFO, "SX1261 LBT configured: rssi_target=%d nb_channel=%d",
+            conf->lbt_conf.rssi_target, conf->lbt_conf.nb_channel);
+    }
+    return LGW_HAL_SUCCESS;
+}
+#endif // CFG_sx1302
+
 str_t lgw_version_info () {
     return "LGW Simulation";
 }
@@ -606,31 +617,6 @@ str_t lgw_version_info () {
 #if defined(CFG_smtcpico)
 int lgw_connect (const char *com_path) {
     return LGW_HAL_SUCCESS;
-}
-#endif
-
-#if defined(CFG_gps_recovery)
-// Mock for SX1302 GPS enable function - used for GPS recovery testing
-static int gps_enabled = 1;
-static int gps_reset_count = 0;
-
-int sx1302_gps_enable(int enable) {
-    if (!enable && gps_enabled) {
-        gps_reset_count++;
-        LOG(MOD_SIM|INFO, "LGWSIM: sx1302_gps_enable(false) - GPS reset count: %d", gps_reset_count);
-    } else if (enable && !gps_enabled) {
-        LOG(MOD_SIM|INFO, "LGWSIM: sx1302_gps_enable(true) - GPS re-enabled");
-    }
-    gps_enabled = enable;
-    return LGW_HAL_SUCCESS;
-}
-
-int lgwsim_get_gps_reset_count(void) {
-    return gps_reset_count;
-}
-
-void lgwsim_reset_gps_reset_count(void) {
-    gps_reset_count = 0;
 }
 #endif
 

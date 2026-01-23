@@ -33,6 +33,7 @@
 #include "s2e.h"
 #include "kwcrc.h"
 #include "timesync.h"
+#include "sx130xconf.h"
 
 
 u1_t s2e_dcDisabled;    // no duty cycle limits - override for test/dev
@@ -1098,9 +1099,11 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
     chdefl_t upchs = {{0}};
     int chslots = 0;
     s2bcn_t bcn = { 0 };
+    lbt_config_t lbt_config = { 0 };  // LBT config from LNS
+    u1_t lbt_enabled_explicit = 0;    // 0=not set, 1=false, 2=true
 
     s2ctx->txpow = 14 * TXPOW_SCALE;  // builtin default
-    s2ctx->ccaEnabled = 0;  // reset CCA - regions that need it will set it
+    s2ctx->ccaEnabled = 0;            // reset CCA state for new router_config
 
     while( (field = uj_nextField(D)) ) {
         switch(field) {
@@ -1395,12 +1398,6 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             dwellDisabled = uj_bool(D) ? 2 : 1;
             break;
         }
-        case J_device_mode: {
-            sys_deviceMode = uj_bool(D) ? 1 : 0;
-            break;
-        }
-#endif // !defined(CFG_prod)
-<<<<<<< HEAD
         case J_duty_cycle_enabled: {
             // Allow LNS to control duty cycle enforcement
             // duty_cycle_enabled: true = station enforces DC limits (default)
@@ -1481,6 +1478,63 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
         case J_pdu_only: {
             s2e_pduOnly = uj_bool(D) ? 1 : 0;
             LOG(MOD_S2E|INFO, "PDU-only mode %s", s2e_pduOnly ? "enabled" : "disabled");
+            break;
+        }
+        case J_lbt_enabled: {
+            lbt_enabled_explicit = uj_bool(D) ? 2 : 1;
+            break;
+        }
+        case J_lbt_rssi_target: {
+            lbt_config.rssi_target = (s1_t)uj_int(D);
+            break;
+        }
+        case J_lbt_rssi_offset: {
+            lbt_config.rssi_offset = (s1_t)uj_int(D);
+            break;
+        }
+        case J_lbt_scan_time_us: {
+            lbt_config.default_scan_time_us = (u2_t)uj_uint(D);
+            break;
+        }
+        case J_lbt_channels: {
+            uj_enterArray(D);
+            while( uj_nextSlot(D) >= 0 ) {
+                if( lbt_config.nb_channel >= LBT_MAX_CHANNELS ) {
+                    LOG(MOD_S2E|WARNING, "Too many LBT channels - max %d supported", LBT_MAX_CHANNELS);
+                    uj_skipValue(D);
+                    continue;
+                }
+                uj_enterObject(D);
+                ujcrc_t lbt_field;
+                while( (lbt_field = uj_nextField(D)) ) {
+                    switch(lbt_field) {
+                    case J_freq_hz: {
+                        lbt_config.channels[lbt_config.nb_channel].freq_hz = uj_uint(D);
+                        break;
+                    }
+                    case J_scan_time_us: {
+                        lbt_config.channels[lbt_config.nb_channel].scan_time_us = (u2_t)uj_uint(D);
+                        break;
+                    }
+                    case J_bandwidth: {
+                        u4_t bw = uj_uint(D);
+                        lbt_config.channels[lbt_config.nb_channel].bandwidth = 
+                            bw == 125000 ? BW125 : bw == 250000 ? BW250 : bw == 500000 ? BW500 : BW125;
+                        break;
+                    }
+                    default: {
+                        uj_skipValue(D);
+                        break;
+                    }
+                    }
+                }
+                uj_exitObject(D);
+                // Apply default scan time if not specified
+                if( lbt_config.channels[lbt_config.nb_channel].scan_time_us == 0 )
+                    lbt_config.channels[lbt_config.nb_channel].scan_time_us = lbt_config.default_scan_time_us;
+                lbt_config.nb_channel++;
+            }
+            uj_exitArray(D);
             break;
         }
         case J_sx1301_conf:
@@ -1575,10 +1629,16 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
         }
     }
     ts_iniTimesync();
+    // Handle explicit lbt_enabled override from LNS
+    if( lbt_enabled_explicit ) {
+        s2ctx->ccaEnabled = (lbt_enabled_explicit == 2) ? 1 : 0;
+    }
+    // Set lbt_config enabled flag based on final ccaEnabled state
+    lbt_config.enabled = s2ctx->ccaEnabled;
     if( !ral_config(hwspec,
                     s2ctx->ccaEnabled ? s2ctx->region : 0,
                     sx130xconf.buf, sx130xconf.bufsize,
-                    &upchs) ) {
+                    &upchs, &lbt_config) ) {
         return 0;
     }
     // Override local settings with server settings if provided

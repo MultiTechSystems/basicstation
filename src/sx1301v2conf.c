@@ -389,14 +389,13 @@ static int find_and_parse_radio_conf (str_t filename, struct sx1301v2conf* sx130
 }
 
 
-static int setup_LBT (struct sx1301v2conf* sx1301v2conf, u4_t cca_region) {
+static int setup_LBT (struct sx1301v2conf* sx1301v2conf, u4_t cca_region, lbt_config_t* lbt_config) {
     u2_t scantime_us = 0;
     s1_t rssi_target = 0;
 
-    if( cca_region == J_AS923_1 ||
-        cca_region == J_AS923_2 ||
-        cca_region == J_AS923_3 ||
-        cca_region == J_AS923_4 ) {
+    // Set region defaults
+    if( cca_region == J_AS923_1 || cca_region == J_AS923_2 || 
+        cca_region == J_AS923_3 || cca_region == J_AS923_4 ) {
         scantime_us = 5000;
         rssi_target = -80;
     }
@@ -408,30 +407,57 @@ static int setup_LBT (struct sx1301v2conf* sx1301v2conf, u4_t cca_region) {
         LOG(MOD_RAL|ERROR, "Failed to setup CCA/LBT for region (crc=0x%08X)", cca_region);
         return 0;
     }
+
+    // Apply LNS-provided RSSI target if specified
+    if( lbt_config && lbt_config->rssi_target != 0 )
+        rssi_target = lbt_config->rssi_target;
+
     for( int i=0; i < MAX_SX1301_NUM; i++ ) {
         sx1301v2conf->boards[SX1301AR_MAX_BOARD_NB].lbtConf.rssi_target = rssi_target;
     }
-    // By default use 125KHz up link frequencies as LBT frequencies
-    // Otherwise we should have gotten a freq list from the server
-    int lbtchan = 0;
-    int boardidx = 0;
 
-    for( int i=0; i < MAX_SX1301_NUM; i++ ) {
-        for( int j=0; j < SX1301AR_CHIP_MULTI_NB; j++ ) {
-            u4_t f = sx1301v2conf->sx1301[i].chanConfs[j].freq_hz;
-            if( f==0 ) continue;
+    // Check if LNS provided explicit LBT channels
+    if( lbt_config && lbt_config->nb_channel > 0 ) {
+        // Distribute LNS-provided LBT channels across boards
+        int lbtchan = 0;
+        int boardidx = 0;
+        for( int i=0; i < lbt_config->nb_channel; i++ ) {
             if( lbtchan == 0 )
                 sx1301v2conf->boards[boardidx].lbtConf.enable = 1;
-            sx1301v2conf->boards[boardidx].lbtConf.channels[lbtchan].freq_hz = f;
-            sx1301v2conf->boards[boardidx].lbtConf.channels[lbtchan].scan_time_us = scantime_us;
+            sx1301v2conf->boards[boardidx].lbtConf.channels[lbtchan].freq_hz = lbt_config->channels[i].freq_hz;
+            sx1301v2conf->boards[boardidx].lbtConf.channels[lbtchan].scan_time_us = 
+                lbt_config->channels[i].scan_time_us ? lbt_config->channels[i].scan_time_us : scantime_us;
             if( (lbtchan += 1) == SX1301AR_LBT_CHANNEL_NB_MAX ) {
                 lbtchan = 0;
                 if( (boardidx += 1) == SX1301AR_MAX_BOARD_NB )
-                    goto stop;
+                    break;
             }
         }
+        LOG(MOD_RAL|INFO, "Using %d LBT channels from LNS configuration", lbt_config->nb_channel);
     }
-  stop:
+    // Otherwise derive from uplink channels (existing behavior)
+    else {
+        int lbtchan = 0;
+        int boardidx = 0;
+
+        for( int i=0; i < MAX_SX1301_NUM; i++ ) {
+            for( int j=0; j < SX1301AR_CHIP_MULTI_NB; j++ ) {
+                u4_t f = sx1301v2conf->sx1301[i].chanConfs[j].freq_hz;
+                if( f==0 ) continue;
+                if( lbtchan == 0 )
+                    sx1301v2conf->boards[boardidx].lbtConf.enable = 1;
+                sx1301v2conf->boards[boardidx].lbtConf.channels[lbtchan].freq_hz = f;
+                sx1301v2conf->boards[boardidx].lbtConf.channels[lbtchan].scan_time_us = scantime_us;
+                if( (lbtchan += 1) == SX1301AR_LBT_CHANNEL_NB_MAX ) {
+                    lbtchan = 0;
+                    if( (boardidx += 1) == SX1301AR_MAX_BOARD_NB )
+                        goto stop;
+                }
+            }
+        }
+      stop:;
+    }
+
     for( int i=0; i < SX1301AR_MAX_BOARD_NB; i++ ) {
         if( sx1301v2conf->boards[i].lbtConf.enable ) {
             if( sx1301ar_conf_lbt(i, &sx1301v2conf->boards[i].lbtConf) ) {
@@ -763,7 +789,7 @@ int sx1301v2conf_challoc (struct sx1301v2conf* sx1301v2conf, chdefl_t* upchs) {
 }
 
 
-int sx1301v2conf_start (struct sx1301v2conf* sx1301v2conf, u4_t cca_region) {
+int sx1301v2conf_start (struct sx1301v2conf* sx1301v2conf, u4_t cca_region, lbt_config_t* lbt_config) {
     int nboards = 0;
     for( int boardidx=0; boardidx < SX1301AR_MAX_BOARD_NB; boardidx++ ) {
         sx1301ar_board_cfg_t* bc = &sx1301v2conf->boards[boardidx].boardConf;
@@ -796,7 +822,7 @@ int sx1301v2conf_start (struct sx1301v2conf* sx1301v2conf, u4_t cca_region) {
             }
         }
     }
-    if( cca_region && !setup_LBT(sx1301v2conf, cca_region) ) {
+    if( cca_region && !setup_LBT(sx1301v2conf, cca_region, lbt_config) ) {
         goto fail;
     }
     if( sx1301ar_start(nboards) != 0 ) {

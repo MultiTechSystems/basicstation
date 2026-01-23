@@ -93,6 +93,8 @@ Q (869.7 MHz - 870 MHz):     1%
 */
 
 enum { DC_BAND_K, DC_BAND_L, DC_BAND_M, DC_BAND_N, DC_BAND_P, DC_BAND_Q, DC_NUM_BANDS };
+// Simplified band categories for sliding window
+enum { DC_DECI, DC_CENTI, DC_MILLI, DC_NUM_SIMPLE_BANDS };
 enum { MAX_DNCHNLS = 48 };
 enum { MAX_UPCHNLS = MAX_130X * 10 };  // 10 channels per chip
 enum { DR_CNT = 16 };

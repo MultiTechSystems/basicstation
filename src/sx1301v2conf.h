@@ -33,6 +33,7 @@
 #include "lgw2/sx1301ar_hal.h"
 #include "s2conf.h"
 #include "ral.h"
+#include "sx130xconf.h"  // for lbt_config_t
 
 
 #define SX1301_ANT_NIL    0
@@ -64,7 +65,7 @@ struct sx1301v2conf {
 
 int  sx1301v2conf_parse_setup (struct sx1301v2conf* sx1301v2conf, int slaveIdx, str_t hwspec, char* json, int jsonlen);
 int  sx1301v2conf_challoc (struct sx1301v2conf* sx1301v2conf, chdefl_t* upchs);
-int  sx1301v2conf_start (struct sx1301v2conf* sx1301v2conf, u4_t region);
+int  sx1301v2conf_start (struct sx1301v2conf* sx1301v2conf, u4_t cca_region, lbt_config_t* lbt_config);
 
 #endif // defined(CFG_lgw2)
 #endif // _sx1301v2conf_h_
