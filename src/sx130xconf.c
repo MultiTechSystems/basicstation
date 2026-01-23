@@ -38,7 +38,7 @@
 #include "lgw/loragw_reg.h"
 #if defined(CFG_sx1302)
 #include "lgw/loragw_sx1302.h"
-#endif // defined(CFG_sx1302)
+#endif
 
 #define SX130X_RFE_MAX 400000  // Max if offset 400kHz
 
@@ -412,7 +412,7 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region, lbt_config
         LOG(MOD_RAL|ERROR, "lgw_lbt_setconf failed: %s", sx130xconf->device);
         return 0;
     }
-#else // SX1302/SX1303 LBT support using SX1261 radio
+#else // SX1302/SX1303 LBT via SX1261
     u2_t scantime_us = 0;
     s1_t rssi_target = -80;
     sx130xconf->sx1261_cfg.enable = true;
@@ -493,7 +493,7 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region, lbt_config
         LOG(MOD_RAL|ERROR, "lgw_sx1261_setconf failed: %s", sx130xconf->device);
         return 0;
     }
-#endif // !defined(CFG_sx1302)
+#endif
     return 1;
 }
 
@@ -820,8 +820,10 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region, lbt_config
     );
     (void) sys_deviceMode; // TODO: Add device mode to sx1302 hal
 #else
+#if !defined(CFG_prod)
     LOG(MOD_RAL|INFO, "Station device: %s (PPS capture %sabled)", sx130xconf->device, sx130xconf->pps ? "en":"dis");
     lgwx_device_mode = sys_deviceMode;
+#endif
 #endif
     log_flushIO();  // flush output since lgw_start may block for quite some time on some concentrators
 

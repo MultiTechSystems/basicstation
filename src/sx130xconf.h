@@ -107,7 +107,7 @@ struct sx130xconf {
 #if !defined(CFG_sx1302)
     struct lgw_conf_lbt_s    lbt;
 #else
-    struct lgw_conf_sx1261_s sx1261_cfg;  // SX1302/SX1303 LBT via SX1261
+    struct lgw_conf_sx1261_s sx1261_cfg;
 #endif
     s2_t  txpowAdjust;   // assuming there is only one TX path / SX130X (scaled by TXPOW_SCALE)
     u1_t  pps;           // enable PPS latch of trigger count
