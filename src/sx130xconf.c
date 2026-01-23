@@ -36,9 +36,8 @@
 #endif // defined(CFG_linux)
 #include "sx130xconf.h"
 #include "lgw/loragw_reg.h"
-#if defined(CFG_sx1302)
-#include "lgw/loragw_sx1302.h"
-#endif // defined(CFG_sx1302)
+// Note: loragw_sx1302.h is only available in full SX1302 HAL, not smtcpico
+// If needed for specific SX1302 functions, guard with appropriate checks
 
 #define SX130X_RFE_MAX 400000  // Max if offset 400kHz
 
