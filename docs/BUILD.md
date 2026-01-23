@@ -35,6 +35,16 @@ ls build-linux-testsim/bin/station
 
 ## Building for MTCDT (Yocto/Bitbake)
 
+### Hardware Mappings
+
+| Machine | Card Model | Chipset | Recipe |
+|---------|------------|---------|--------|
+| mtcdt | MTAC-003 | SX1303 | lora-basic-station-sx1303 |
+| mtcdt | MTAC-LORA-1.5 | SX1301 | lora-basic-station |
+| mtcap3 | - | SX1303 | lora-basic-station-sx1303 |
+| mtcap | - | SX1301 | lora-basic-station |
+| mtcap2 | - | SX1301 | lora-basic-station |
+
 ### Setup Build Environment
 
 ```bash
