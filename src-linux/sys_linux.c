@@ -1024,6 +1024,7 @@ static void startupMaster2 (tmr_t* tmr) {
 #endif
     rt_addFeature("updn-dr");  // supports separate uplink/downlink datarate tables (RP002-1.0.5)
     rt_addFeature("dutyconf");  // supports duty_cycle_enabled in router_config
+    rt_addFeature("pdu-only");  // supports raw PDU mode via pdu_only in router_config
     sys_enableCmdFIFO(makeFilepath("~/cmd",".fifo",NULL,0));
     if( gpsDevice ) {
         rt_addFeature("gps");

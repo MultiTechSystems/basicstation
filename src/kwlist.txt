@@ -89,6 +89,7 @@ ontime
 P
 pa_gain
 pdu
+pdu_only
 preamble
 priority
 pps
