@@ -46,6 +46,15 @@ All AS923 variants:
 - **CCA Enabled**: Yes (Listen Before Talk required)
 - **Duty Cycle**: 10% per channel
 
+### IL915 (Israel 915-917 MHz)
+
+- **Frequency Range**: 915-917 MHz
+- **Max EIRP**: 14 dBm
+- **Default Channels**: 915.9, 916.1, 916.3 MHz
+- **Data Rates**: DR0-DR5 (SF12-SF7 at 125 kHz), DR6 (SF7 at 250 kHz), DR7 (FSK)
+- **CCA Enabled**: No (no Listen Before Talk requirement)
+- **Note**: IL915 uses the same frequency plan as AS923-4 but without CCA requirements
+
 ### US915 (United States 902-928 MHz)
 
 - **Max EIRP**: Updated to 36 dBm to allow maximum power with any antenna gain
@@ -105,13 +114,52 @@ For backward compatibility, the following legacy region names are supported:
 | AS923JP | AS923-1 |
 | US902 | US915 |
 
+## CCA/LBT Implementation
+
+Clear Channel Assessment (CCA) / Listen Before Talk (LBT) is supported for both SX1301 and SX1302/SX1303 concentrators.
+
+### SX1301 LBT Configuration
+
+For SX1301, LBT is configured using the built-in FPGA-based spectrum scanning:
+- **RSSI Target**: -80 dBm
+- **Scan Time**: 5000 µs per channel
+
+### SX1302/SX1303 LBT Configuration
+
+For SX1302/SX1303, LBT uses the SX1261 radio for spectrum scanning:
+- **RSSI Target**: -80 dBm
+- **Scan Time**: 5000 µs per channel
+- **TX Dwell Time**: 4000 ms maximum
+
+### Regions Requiring CCA
+
+| Region | CCA Required |
+|--------|--------------|
+| AS923-1 | Yes |
+| AS923-2 | Yes |
+| AS923-3 | Yes |
+| AS923-4 | Yes |
+| KR920 | Yes |
+| IL915 | No |
+| Other regions | No |
+
 ## Testing
 
-Region support can be tested using the `test6-regions` regression test:
+Region support can be tested using the regression tests:
 
 ```bash
 cd regr-tests
+# Test all region variants
 ./run-regression-tests -T test6-regions
+
+# Test AS923 variants and IL915 with CCA verification
+./run-regression-tests -T test6m-as923-variants
 ```
 
-This test verifies that the station accepts router_config for each supported region and configures the correct parameters.
+### test6m-as923-variants
+
+This test verifies:
+1. All AS923 variants (AS923-1, AS923-2, AS923-3, AS923-4) are correctly recognized
+2. IL915 is correctly recognized
+3. CCA/LBT is enabled for AS923 variants and blocks transmissions on busy channels
+4. CCA/LBT is disabled for IL915 (verified via configuration logs)

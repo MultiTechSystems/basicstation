@@ -42,6 +42,8 @@
 
 #define SX130X_RFE_MAX 400000  // Max if offset 400kHz
 
+uint32_t TX_DWELLTIME_LBT = 4000; // default LBT transmit dwell time in ms
+
 extern const uint8_t ifmod_config[LGW_IF_CHAIN_NB];
 
 static void parse_tx_gain_lut (ujdec_t* D, struct lgw_tx_gain_lut_s* txlut) {
@@ -345,12 +347,16 @@ static int find_sx130x_conf (str_t filename, struct sx130xconf* sx130xconf) {
     return 1;
 }
 
+static void dump_lbtConf (struct sx130xconf* sx130xconf);
 
 static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
 #if !defined(CFG_sx1302) // For now sx1302 does not support CCA
     u2_t scantime_us = 0;
 
-    if( cca_region == J_AS923_1 ) {
+    if( cca_region == J_AS923_1 ||
+        cca_region == J_AS923_2 ||
+        cca_region == J_AS923_3 ||
+        cca_region == J_AS923_4 ) {
         scantime_us = 5000;
         sx130xconf->lbt.rssi_target = -80;
     }
@@ -384,9 +390,78 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
     for( int i=0; i<sx130xconf->lbt.nb_channel; i++ )
         sx130xconf->lbt.channels[i].scan_time_us = scantime_us;
     sx130xconf->lbt.enable = 1;
+
+    dump_lbtConf(sx130xconf);
+
     int e = lgw_lbt_setconf(sx130xconf->lbt);
     if( e != LGW_HAL_SUCCESS ) {
         LOG(MOD_RAL|ERROR, "lgw_lbt_setconf failed: %s", sx130xconf->device);
+        return 0;
+    }
+#else
+    u2_t scantime_us = 0;
+    sx130xconf->sx1261_cfg.enable = true;
+
+    /*
+        based off sx1301 spidev choose sx1261 spidev
+    */
+    if (strcmp(sx130xconf->device, "/dev/spidev0.0") == 0) {
+        strcpy(sx130xconf->sx1261_cfg.spi_path, "/dev/spidev0.1");
+    } else if (strcmp(sx130xconf->device, "/dev/spidev1.0") == 0) {
+        strcpy(sx130xconf->sx1261_cfg.spi_path, "/dev/spidev1.1");
+    }
+
+    if( cca_region == J_AS923_1 ||
+        cca_region == J_AS923_2 ||
+        cca_region == J_AS923_3 ||
+        cca_region == J_AS923_4 ) {
+        scantime_us = 5000;
+        sx130xconf->sx1261_cfg.lbt_conf.rssi_target = -80;
+    }
+    else if( cca_region == J_KR920 ) {
+        scantime_us = 5000;
+        sx130xconf->sx1261_cfg.lbt_conf.rssi_target = -67;
+    }
+    else {
+        LOG(MOD_RAL|ERROR, "Failed to setup CCA/LBT for region (crc=0x%08X)", cca_region);
+        return 0;
+    }
+
+    if( sx130xconf->sx1261_cfg.lbt_conf.nb_channel == 0 ) {
+        u4_t cfreq = 0;
+        int n = max(8,LGW_IF_CHAIN_NB);
+
+        for( int ifi=0; ifi < n; ifi++ ) {
+            if( !sx130xconf->ifconf[ifi].enable )
+                continue;
+            if( sx130xconf->sx1261_cfg.lbt_conf.nb_channel < LGW_LBT_CHANNEL_NB_MAX ) {
+                cfreq = sx130xconf->rfconf[sx130xconf->ifconf[ifi].rf_chain].freq_hz;
+                if( !sx130xconf->rfconf[sx130xconf->ifconf[ifi].rf_chain].enable )
+                    continue;
+
+                u4_t freq = cfreq + sx130xconf->ifconf[ifi].freq_hz;
+                u1_t bw = sx130xconf->ifconf[ifi].bandwidth;
+
+                if (bw < BW_500KHZ) {
+                    sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].freq_hz = freq;
+                    sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].bandwidth = bw;
+                    sx130xconf->sx1261_cfg.lbt_conf.nb_channel += 1;
+                }
+            }
+        }
+    }
+    for( int i=0; i<sx130xconf->sx1261_cfg.lbt_conf.nb_channel; i++ ) {
+        sx130xconf->sx1261_cfg.lbt_conf.channels[i].scan_time_us = scantime_us;
+        sx130xconf->sx1261_cfg.lbt_conf.channels[i].transmit_time_ms = TX_DWELLTIME_LBT;
+    }
+
+    sx130xconf->sx1261_cfg.lbt_conf.enable = true;
+
+    dump_lbtConf(sx130xconf);
+
+    int e = lgw_sx1261_setconf(&(sx130xconf->sx1261_cfg));
+    if( e != LGW_HAL_SUCCESS ) {
+        LOG(MOD_RAL|ERROR, "lgw_sx1261_setconf failed: %s", sx130xconf->device);
         return 0;
     }
 #endif // !defined(CFG_sx1302)
@@ -615,6 +690,19 @@ static void dump_lbtConf (struct sx130xconf* sx130xconf) {
         for( int i=0; i < sx130xconf->lbt.nb_channel; i++ ) {
             LOG(MOD_RAL|INFO, "  %2d: freq=%F scan=%dus",
                 i, sx130xconf->lbt.channels[i].freq_hz, sx130xconf->lbt.channels[i].scan_time_us);
+        }
+    } else {
+        LOG(MOD_RAL|INFO, "SX130x LBT not enabled");
+    }
+    log_flushIO();
+#else
+    if( sx130xconf->sx1261_cfg.lbt_conf.enable ) {
+        LOG(MOD_RAL|INFO, "SX130x LBT enabled: rssi_target=%d rssi_offset=%d",
+            sx130xconf->sx1261_cfg.lbt_conf.rssi_target, sx130xconf->sx1261_cfg.rssi_offset);
+        LOG(MOD_RAL|INFO, "Packet time-on-air limit: %d ms", TX_DWELLTIME_LBT);
+        for( int i=0; i < sx130xconf->sx1261_cfg.lbt_conf.nb_channel; i++ ) {
+            LOG(MOD_RAL|INFO, "  %2d: freq=%F scan=%dus",
+                i, sx130xconf->sx1261_cfg.lbt_conf.channels[i].freq_hz, sx130xconf->sx1261_cfg.lbt_conf.channels[i].scan_time_us);
         }
     } else {
         LOG(MOD_RAL|INFO, "SX130x LBT not enabled");

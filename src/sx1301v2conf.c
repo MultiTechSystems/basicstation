@@ -393,7 +393,10 @@ static int setup_LBT (struct sx1301v2conf* sx1301v2conf, u4_t cca_region) {
     u2_t scantime_us = 0;
     s1_t rssi_target = 0;
 
-    if( cca_region == J_AS923_1 ) {
+    if( cca_region == J_AS923_1 ||
+        cca_region == J_AS923_2 ||
+        cca_region == J_AS923_3 ||
+        cca_region == J_AS923_4 ) {
         scantime_us = 5000;
         rssi_target = -80;
     }

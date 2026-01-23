@@ -377,6 +377,51 @@ router_config_AS923_2 = _make_as923_config('AS923-2')
 router_config_AS923_3 = _make_as923_config('AS923-3')
 router_config_AS923_4 = _make_as923_config('AS923-4')
 
+# IL915 - Israel 915 MHz (no CCA, different power limits)
+router_config_IL915 = {
+    'msgtype': 'router_config',
+    'region': 'IL915',
+    'DRs': [(12, 125, 0),
+            (11, 125, 0),
+            (10, 125, 0),
+            (9, 125, 0),
+            (8, 125, 0),
+            (7, 125, 0),
+            (7, 250, 0),
+            (0, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0)],
+    'max_eirp': 14.0,
+    'protocol': 1,
+    'freq_range': [915000000, 917000000],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': 0, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if': 200000, 'radio': 0},
+                     'chan_multiSF_3': {'enable': False},
+                     'chan_multiSF_4': {'enable': False},
+                     'chan_multiSF_5': {'enable': False},
+                     'chan_multiSF_6': {'enable': False},
+                     'chan_multiSF_7': {'enable': False},
+                     'radio_0': {'enable': True, 'freq': 916100000},
+                     'radio_1': {'enable': False, 'freq': 0}}],
+    'upchannels': [(915900000, 0, 5),
+                   (916100000, 0, 5),
+                   (916300000, 0, 5)]
+}
+
 # RP2 1.0.5 router configs for uplink/downlink testing (SX1301 compatible - DR0-5 only)
 router_config_AS923_8ch_RP2_sx1301 = {
     **base_regions['AS923_RP2_1_0_5'],

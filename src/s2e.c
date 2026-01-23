@@ -906,6 +906,7 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
     s2bcn_t bcn = { 0 };
 
     s2ctx->txpow = 14 * TXPOW_SCALE;  // builtin default
+    s2ctx->ccaEnabled = 0;  // reset CCA - regions that need it will set it
 
     while( (field = uj_nextField(D)) ) {
         switch(field) {
