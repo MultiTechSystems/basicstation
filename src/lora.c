@@ -65,6 +65,11 @@
 #define OFF_jreq_mic 19
 #define OFF_jreq_len 23
 
+// Rejoin frame constants
+#define OFF_rejoin_type    1
+#define OFF_rejoin_minlen 19  // Type 0/2
+#define OFF_rejoin_maxlen 24  // Type 1
+
 // +------------------------------------------------------------+
 // |                           DATA FRAME                       |
 // +-----+---------+-----+-------+-------+------+---------+-----+
@@ -104,7 +109,8 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
         xprintf(lbuf, "%s %16.16H", msgtype, len, &frame[0]);
         return 1;
     }
-    if( ftype == FRMTYPE_JREQ || ftype == FRMTYPE_REJOIN ) {
+        // Handle Join Request - parse into fields (backward compatible)
+    if( ftype == FRMTYPE_JREQ ) {
         if( len != OFF_jreq_len)
             goto badframe;
         uL_t joineui = rt_rlsbf8(&frame[OFF_joineui]);
@@ -113,28 +119,52 @@ int s2e_parse_lora_frame (ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
             uL_t* f = s2e_joineuiFilter-2;
             while( *(f += 2) ) {
                 if( joineui >= f[0] && joineui <= f[1] )
-                    goto out1;
+                    goto out_jreq;
             }
             
             xprintf(lbuf, "Join EUI %E filtered", joineui);
             return 0;
-          out1:;
+          out_jreq:;
         }
-        str_t msgtype = (ftype == FRMTYPE_JREQ ? "jreq" : "rejoin");
         u1_t  mhdr = frame[OFF_mhdr];
         uL_t  deveui = rt_rlsbf8(&frame[OFF_deveui]);
         u2_t  devnonce = rt_rlsbf2(&frame[OFF_devnonce]);
         s4_t  mic = (s4_t)rt_rlsbf4(&frame[len-4]);
         uj_encKVn(buf,
-                  "msgtype", 's', msgtype,
+                  "msgtype", 's', "jreq",
                   "MHdr",    'i', mhdr,
                   rt_joineui,'E', joineui,
                   rt_deveui, 'E', deveui,
                   "DevNonce",'i', devnonce,
                   "MIC",     'i', mic,
                   NULL);
-        xprintf(lbuf, "%s MHdr=%02X %s=%:E %s=%:E DevNonce=%d MIC=%d",
-                msgtype, mhdr, rt_joineui, joineui, rt_deveui, deveui, devnonce, mic);
+        xprintf(lbuf, "jreq MHdr=%02X %s=%:E %s=%:E DevNonce=%d MIC=%d",
+                mhdr, rt_joineui, joineui, rt_deveui, deveui, devnonce, mic);
+        return 1;
+    }
+    
+    // Handle Rejoin Request - send raw PDU to LNS without filtering
+    // Rejoin frames have different lengths and field layouts depending on type:
+    //   Type 0/2: 19 bytes (NetID + DevEUI + RJcount)
+    //   Type 1:   24 bytes (JoinEUI + DevEUI + RJcount)
+    // Note: Rejoin frames are NOT filtered by JoinEUI or NetID - LNS handles validation
+    if( ftype == FRMTYPE_REJOIN ) {
+        if( len < OFF_rejoin_minlen || len > OFF_rejoin_maxlen )
+            goto badframe;
+        
+        u1_t mhdr = frame[OFF_mhdr];
+        u1_t rjtype = frame[OFF_rejoin_type];
+        s4_t mic = (s4_t)rt_rlsbf4(&frame[len-4]);
+        
+        // Send raw PDU - LNS parses based on rejoin type and LoRaWAN version
+        uj_encKVn(buf,
+                  "msgtype", 's', "rejoin",
+                  "MHdr",    'i', mhdr,
+                  "pdu",     'H', len, &frame[0],
+                  "MIC",     'i', mic,
+                  NULL);
+        xprintf(lbuf, "rejoin MHdr=%02X RJType=%d len=%d MIC=%d",
+                mhdr, rjtype, len, mic);
         return 1;
     }
     u1_t foptslen = frame[OFF_fctrl] & 0xF;

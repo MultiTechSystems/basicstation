@@ -96,5 +96,82 @@ void selftest_lora () {
     s2e_netidFilter[0] = s2e_netidFilter[1] = s2e_netidFilter[2] = s2e_netidFilter[3] = 0;
     TCHECK(!s2e_parse_lora_frame(&B, (const u1_t*)Tdaup1, 12+1+3, NULL));
 
+    // Reset filters for rejoin tests
+    s2e_netidFilter[0] = s2e_netidFilter[1] = s2e_netidFilter[2] = s2e_netidFilter[3] = 0xFFFFFFFF;
+    s2e_joineuiFilter[0] = 0;
+
+    // ========================================================================
+    // Rejoin Request Tests
+    // ========================================================================
+
+    // Rejoin Type 0: MHdr(1) + RJType(1) + NetID(3) + DevEUI(8) + RJcount0(2) + MIC(4) = 19 bytes
+    B.pos = 0;
+    const u1_t Trejoin0[] = {
+        0xC0,                                           // MHdr (rejoin)
+        0x00,                                           // RJType = 0
+        0x01, 0x02, 0x03,                               // NetID (little endian)
+        0xF1, 0xE3, 0xF5, 0xE7, 0xF9, 0xEB, 0xFD, 0xEF, // DevEUI
+        0x10, 0x20,                                     // RJcount0
+        0xA0, 0xA1, 0xA2, 0xA3                          // MIC
+    };
+    TCHECK(s2e_parse_lora_frame(&B, Trejoin0, 19, NULL));
+    xeos(&B);
+    TCHECK(strstr(B.buf, "\"msgtype\":\"rejoin\"") != NULL);
+    TCHECK(strstr(B.buf, "\"MHdr\":192") != NULL);
+    TCHECK(strstr(B.buf, "\"pdu\":\"C00001020") != NULL);  // Starts with MHdr + RJType + NetID start
+    TCHECK(strstr(B.buf, "\"MIC\":-1549622880") != NULL);
+
+    // Rejoin Type 1: MHdr(1) + RJType(1) + JoinEUI(8) + DevEUI(8) + RJcount1(2) + MIC(4) = 24 bytes
+    B.pos = 0;
+    const u1_t Trejoin1[] = {
+        0xC0,                                           // MHdr (rejoin)
+        0x01,                                           // RJType = 1
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, // JoinEUI
+        0xF1, 0xE3, 0xF5, 0xE7, 0xF9, 0xEB, 0xFD, 0xEF, // DevEUI
+        0x30, 0x40,                                     // RJcount1
+        0xB0, 0xB1, 0xB2, 0xB3                          // MIC
+    };
+    TCHECK(s2e_parse_lora_frame(&B, Trejoin1, 24, NULL));
+    xeos(&B);
+    TCHECK(strstr(B.buf, "\"msgtype\":\"rejoin\"") != NULL);
+    TCHECK(strstr(B.buf, "\"MHdr\":192") != NULL);
+    TCHECK(strstr(B.buf, "\"MIC\":-1280134736") != NULL);
+
+    // Rejoin Type 2: Same format as Type 0, 19 bytes
+    B.pos = 0;
+    const u1_t Trejoin2[] = {
+        0xC0,                                           // MHdr (rejoin)
+        0x02,                                           // RJType = 2
+        0x04, 0x05, 0x06,                               // NetID
+        0xF1, 0xE3, 0xF5, 0xE7, 0xF9, 0xEB, 0xFD, 0xEF, // DevEUI
+        0x50, 0x60,                                     // RJcount2
+        0xC0, 0xC1, 0xC2, 0xC3                          // MIC
+    };
+    TCHECK(s2e_parse_lora_frame(&B, Trejoin2, 19, NULL));
+    xeos(&B);
+    TCHECK(strstr(B.buf, "\"msgtype\":\"rejoin\"") != NULL);
+
+    // Rejoin too short (< 19 bytes) - should be rejected
+    B.pos = 0;
+    TCHECK(!s2e_parse_lora_frame(&B, Trejoin0, 18, NULL));
+
+    // Rejoin too long (> 24 bytes) - should be rejected
+    B.pos = 0;
+    u1_t TrejoinLong[25];
+    memcpy(TrejoinLong, Trejoin1, 24);
+    TrejoinLong[24] = 0xFF;
+    TCHECK(!s2e_parse_lora_frame(&B, TrejoinLong, 25, NULL));
+
+    // Rejoin frames are NOT filtered by JoinEUI - always passed to LNS
+    // Test that rejoin passes even with JoinEUI filter enabled
+    B.pos = 0;
+    memcpy(s2e_joineuiFilter, euiFilter1, sizeof(euiFilter1));
+    TCHECK(s2e_parse_lora_frame(&B, Trejoin1, 24, NULL));  // Type 1 passes despite filter
+
+    B.pos = 0;
+    TCHECK(s2e_parse_lora_frame(&B, Trejoin0, 19, NULL));  // Type 0 passes despite filter
+
+    s2e_joineuiFilter[0] = 0;  // Clear filter
+
     free(jsonbuf);
 }
