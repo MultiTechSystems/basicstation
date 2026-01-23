@@ -818,6 +818,14 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region, lbt_config
         sx130xconf->boardconf.com_type == LGW_COM_USB ? "usb" : "spi",
         sx130xconf->device, sx130xconf->pps ? "en":"dis"
     );
+
+    if (sx130xconf->boardconf.com_type == LGW_COM_SPI) {
+        /* Board reset */
+        if (reset_lgw_start() != LGW_HAL_SUCCESS) {
+            errmsg = "lgw_reset";
+            goto fail;
+        }
+    }
     (void) sys_deviceMode; // TODO: Add device mode to sx1302 hal
 #else
 #if !defined(CFG_prod)
