@@ -211,6 +211,31 @@ base_regions["KR920"] = {
         'freq_range': [920900000, 923300000],
     }
 
+# AS923-1 basic definition for LBT testing
+base_regions["AS923-1"] = {
+        'msgtype': 'router_config',
+        'region': 'AS923-1',
+        'DRs': [(12, 125, 0),
+            (11, 125, 0),
+            (10, 125, 0),
+            (9, 125, 0),
+            (8, 125, 0),
+            (7, 125, 0),
+            (7, 250, 0),
+            (0, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0),
+            (-1, 0, 0)],
+        'max_eirp': 16.0,
+        'protocol': 1,
+        'freq_range': [915000000, 928000000],
+    }
+
 # AS923 RP2 1.0.5 with SF5/SF6 at DR12/DR13 (symmetric)
 # Used for AS923-1, AS923-2, AS923-3, AS923-4 variants
 base_regions["AS923_RP2_1_0_5"] = {
@@ -635,6 +660,31 @@ router_config_KR920 = {
     'upchannels': [(922100000, 0, 5),
                    (922300000, 0, 5),
                    (922500000, 0, 5)]
+}
+
+# AS923-1 basic config for LBT testing
+router_config_AS923 = {
+    **base_regions['AS923-1'],
+    'JoinEui': None,
+    'NetID': None,
+    'bcning': None,
+    'config': {},
+    'hwspec': 'sx1301/1',
+    'sx1301_conf': [{'chan_FSK': {'enable': False},
+                     'chan_Lora_std': {'enable': False},
+                     'chan_multiSF_0': {'enable': True, 'if': -200000, 'radio': 0},
+                     'chan_multiSF_1': {'enable': True, 'if': 0, 'radio': 0},
+                     'chan_multiSF_2': {'enable': True, 'if': 200000, 'radio': 0},
+                     'chan_multiSF_3': {'enable': False},
+                     'chan_multiSF_4': {'enable': False},
+                     'chan_multiSF_5': {'enable': False},
+                     'chan_multiSF_6': {'enable': False},
+                     'chan_multiSF_7': {'enable': False},
+                     'radio_0': {'enable': True, 'freq': 923400000, 'type': 'SX1257'},
+                     'radio_1': {'enable': False, 'freq': 0, 'type': 'SX1257'}}],
+    'upchannels': [(923200000, 0, 5),
+                   (923400000, 0, 5),
+                   (923600000, 0, 5)]
 }
 
 # AS923-1 RP2 1.0.5 - SX1301 backward compatible (DR0-5)
