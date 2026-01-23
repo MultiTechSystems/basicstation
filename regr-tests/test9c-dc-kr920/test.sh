@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# KR920 Duty Cycle Tests
+# Tests per-channel DC (2% per channel with LBT)
+
+. ../testlib.sh
+
+TESTS=(
+    "DISABLED"   # duty_cycle_enabled: false
+    "SINGLE_CH"  # Single channel DC (stricter 2%)
+    "MULTI_CH"   # Multi-channel separate budgets
+)
+
+if [ -n "$DC_TEST" ]; then
+    TESTS=("$DC_TEST")
+fi
+
+failed=0
+passed=0
+
+for test in "${TESTS[@]}"; do
+    echo ""
+    echo "=== KR920: $test ==="
+    DC_TEST="$test" python test.py
+    if [ $? -eq 0 ]; then
+        echo "PASSED: $test"
+        passed=$((passed + 1))
+    else
+        echo "FAILED: $test"
+        failed=$((failed + 1))
+    fi
+    sleep 0.5
+done
+
+echo ""
+echo "KR920 DC Tests: $passed passed, $failed failed"
+
+if [ $failed -eq 0 ]; then
+    banner "KR920 duty cycle tests passed"
+else
+    exit 1
+fi
+
+collect_gcda
