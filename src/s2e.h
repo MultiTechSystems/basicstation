@@ -84,7 +84,9 @@ enum { PRIO_BEACON             = 128 };
 
 
 
-enum { DC_DECI, DC_CENTI, DC_MILLI, DC_NUM_BANDS };
+// EU868 frequency bands per ETSI EN 300 220
+// Each band has independent duty cycle tracking
+enum { DC_BAND_K, DC_BAND_L, DC_BAND_M, DC_BAND_N, DC_BAND_P, DC_BAND_Q, DC_NUM_BANDS };
 enum { MAX_DNCHNLS = 48 };
 enum { MAX_UPCHNLS = MAX_130X * 10 };  // 10 channels per chip
 enum { DR_CNT = 16 };

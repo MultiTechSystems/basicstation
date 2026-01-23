@@ -3,16 +3,19 @@
 """
 EU868 Duty Cycle Tests
 
-Tests EU868 band-based duty cycle enforcement:
-- 10% DC band (869.4-869.65 MHz) - DC_DECI
-- 1% DC band (868.0-868.6 MHz, 869.7-870.0 MHz) - DC_CENTI  
-- 0.1% DC band (everything else) - DC_MILLI
+Tests EU868 band-based duty cycle enforcement per ETSI EN 300 220:
+- Band K: 863-865 MHz:      0.1% DC
+- Band L: 865-868 MHz:      1% DC
+- Band M: 868.0-868.6 MHz:  1% DC
+- Band N: 868.7-869.2 MHz:  0.1% DC
+- Band P: 869.4-869.65 MHz: 10% DC
+- Band Q: 869.7-870.0 MHz:  1% DC
 
 Sub-cases:
 - DISABLED: duty_cycle_enabled: false - all frames pass
-- BAND_10PCT: 10% band - rapid TX allowed
-- BAND_1PCT: 1% band - some blocking
-- BAND_01PCT: 0.1% band - heavy blocking
+- BAND_10PCT: 10% band (Band P) - rapid TX allowed
+- BAND_1PCT: 1% band (Band L/M) - some blocking
+- BAND_01PCT: 0.1% band (Band K) - heavy blocking
 - MULTIBAND: Different bands have separate budgets
 - WINDOW: Send to exhaust DC, wait, verify more can be sent
 """
@@ -39,10 +42,10 @@ muxs = None
 sim = None
 test_result = None
 
-# EU868 DC band frequencies
-BAND_DECI  = 869525000   # 10% DC band (869.4-869.65 MHz)
-BAND_CENTI = 868100000   # 1% DC band (868.0-868.6 MHz)
-BAND_MILLI = 867100000   # 0.1% DC band
+# EU868 DC band frequencies per ETSI EN 300 220
+BAND_10PCT = 869525000   # 10% DC: Band P (869.4-869.65 MHz)
+BAND_1PCT  = 868100000   # 1% DC:  Band M (868.0-868.6 MHz)
+BAND_01PCT = 864100000   # 0.1% DC: Band K (863-865 MHz)
 
 # DC rates (multiplier on airtime for off-time)
 # 10% = 10x, 1% = 100x, 0.1% = 1000x
@@ -54,40 +57,40 @@ BAND_MILLI = 867100000   # 0.1% DC band
 TEST_CASES = {
     'DISABLED': {
         'duty_cycle_enabled': False,
-        'freqs': [(BAND_MILLI, BAND_MILLI)] * 5,
+        'freqs': [(BAND_01PCT, BAND_01PCT)] * 5,
         'intervals': [1.5] * 5,
         'min_tx': 4, 'max_tx': 5,  # May get 4-5 due to timing
         'desc': 'duty_cycle_enabled: false - all frames pass'
     },
     'BAND_10PCT': {
         'duty_cycle_enabled': None,
-        'freqs': [(BAND_DECI, BAND_DECI)] * 5,
+        'freqs': [(BAND_10PCT, BAND_10PCT)] * 5,
         'intervals': [2.0] * 5,  # 2s allows RxDelay(1s) + TX + margin
         'min_tx': 4, 'max_tx': 5,
-        'desc': '10% band (869.525MHz) - rapid TX allowed'
+        'desc': '10% band P (869.525MHz) - rapid TX allowed'
     },
     'BAND_1PCT': {
         'duty_cycle_enabled': None,
-        'freqs': [(BAND_CENTI, BAND_CENTI)] * 5,
+        'freqs': [(BAND_1PCT, BAND_1PCT)] * 5,
         'intervals': [2.0] * 5,  # 2s < 5.1s DC off-time, expect some blocking
         'min_tx': 1, 'max_tx': 3,  # Some blocking expected
-        'desc': '1% band (868.1MHz) - some frames blocked'
+        'desc': '1% band M (868.1MHz) - some frames blocked'
     },
     'BAND_01PCT': {
         'duty_cycle_enabled': None,
-        'freqs': [(BAND_MILLI, BAND_MILLI)] * 5,
+        'freqs': [(BAND_01PCT, BAND_01PCT)] * 5,
         'intervals': [2.0] * 5,  # 2s << 51s DC off-time, heavy blocking
         'min_tx': 1, 'max_tx': 2,  # Heavy blocking expected
-        'desc': '0.1% band (867.1MHz) - heavy blocking'
+        'desc': '0.1% band K (864.1MHz) - heavy blocking'
     },
     'MULTIBAND': {
         'duty_cycle_enabled': None,
         'freqs': [
-            (BAND_DECI, BAND_DECI),    # 10% band
-            (BAND_CENTI, BAND_CENTI),  # 1% band  
-            (BAND_MILLI, BAND_MILLI),  # 0.1% band
-            (BAND_DECI, BAND_DECI),    # 10% band again
-            (BAND_CENTI, BAND_CENTI),  # 1% band again
+            (BAND_10PCT, BAND_10PCT),  # 10% band P
+            (BAND_1PCT, BAND_1PCT),    # 1% band M
+            (BAND_01PCT, BAND_01PCT),  # 0.1% band K
+            (BAND_10PCT, BAND_10PCT),  # 10% band P again
+            (BAND_1PCT, BAND_1PCT),    # 1% band M again
         ],
         'intervals': [2.0] * 5,
         'min_tx': 3, 'max_tx': 5,
@@ -96,11 +99,11 @@ TEST_CASES = {
     'WINDOW': {
         'duty_cycle_enabled': None,
         'freqs': [
-            (BAND_DECI, BAND_DECI),  # TX 1 - succeeds
-            (BAND_DECI, BAND_DECI),  # TX 2 - may block if too fast
-            (BAND_DECI, BAND_DECI),  # TX 3 - after wait, should work
-            (BAND_DECI, BAND_DECI),  # TX 4
-            (BAND_DECI, BAND_DECI),  # TX 5
+            (BAND_10PCT, BAND_10PCT),  # TX 1 - succeeds
+            (BAND_10PCT, BAND_10PCT),  # TX 2 - may block if too fast
+            (BAND_10PCT, BAND_10PCT),  # TX 3 - after wait, should work
+            (BAND_10PCT, BAND_10PCT),  # TX 4
+            (BAND_10PCT, BAND_10PCT),  # TX 5
         ],
         'intervals': [1.0, 1.0, 2.5, 2.0, 2.0],  # Fast burst, wait, resume
         'min_tx': 3, 'max_tx': 5,
@@ -137,7 +140,7 @@ class TestLgwSimServer(su.LgwSimServer):
                     upfreq, _ = self.test_freqs[idx]
                     interval = self.test_intervals[idx] if idx < len(self.test_intervals) else 1.5
                 else:
-                    upfreq = BAND_MILLI
+                    upfreq = BAND_01PCT
                     interval = 1.5
                 
                 logger.debug('LGWSIM - UPDF FCnt=%d freq=%.3f' % (self.fcnt, upfreq/1e6))
@@ -200,7 +203,7 @@ class TestMuxs(tu.Muxs):
         if fcnt < len(self.test_freqs):
             _, dnfreq = self.test_freqs[fcnt]
         else:
-            dnfreq = BAND_MILLI
+            dnfreq = BAND_01PCT
             
         dnframe = {
             'msgtype': 'dnmsg',
