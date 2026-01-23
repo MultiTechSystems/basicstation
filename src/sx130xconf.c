@@ -42,8 +42,6 @@
 
 #define SX130X_RFE_MAX 400000  // Max if offset 400kHz
 
-uint32_t TX_DWELLTIME_LBT = 4000; // J_tx_dwelltime_lbt
-
 extern const uint8_t ifmod_config[LGW_IF_CHAIN_NB];
 
 static void parse_tx_gain_lut (ujdec_t* D, struct lgw_tx_gain_lut_s* txlut) {
@@ -69,7 +67,7 @@ static void parse_tx_gain_lut (ujdec_t* D, struct lgw_tx_gain_lut_s* txlut) {
 	            }
 #else
             case J_dig_gain: { txlut->lut[slot].dig_gain = uj_intRange(D,    0,  3); break; }
-            case J_dac_gain: { txlut->lut[slot].dac_gain = 3;  uj_intRange(D,    0,  3); break; }
+            case J_dac_gain: { txlut->lut[slot].dac_gain = uj_intRange(D,    0,  3); break; }
             case J_mix_gain: { txlut->lut[slot].mix_gain = uj_intRange(D,    0, 15); break; }
 #endif
             case J_rf_power: { txlut->lut[slot].rf_power = uj_intRange(D, -128,127); break; }
@@ -175,10 +173,6 @@ static int parse_bandwidth (ujdec_t* D) {
 static int parse_spread_factor (ujdec_t* D) {
     sL_t sf = uj_int(D);
     switch(sf) {
-#if defined(CFG_sx1302)
-    case  5: return DR_LORA_SF5;  break;
-    case  6: return DR_LORA_SF6;  break;
-#endif
     case  7: return DR_LORA_SF7;  break;
     case  8: return DR_LORA_SF8;  break;
     case  9: return DR_LORA_SF9;  break;
@@ -195,9 +189,6 @@ static int parse_spread_factor (ujdec_t* D) {
 static void parse_ifconf (ujdec_t* D, struct lgw_conf_rxif_s* ifconf) {
     ujcrc_t field;
     uj_enterObject(D);
-
-    memset(ifconf, 0, sizeof(struct lgw_conf_rxif_s));
-
     while( (field = uj_nextField(D)) ) {
         switch(field) {
         case J_enable:        { ifconf->enable         = uj_bool(D); break; }
@@ -230,7 +221,6 @@ static void setDevice (struct sx130xconf* sx130xconf, str_t device) {
     str_t dev = sys_radioDevice(device, &comtype);
     int sz = sizeof(sx130xconf->device);
     int n = snprintf(sx130xconf->device, sz, "%s", dev);
-
     if( n > sz-1 )
         LOG(ERROR, "Device string too long (max %d chars): %s", sz-1, dev);
 #if defined(CFG_sx1302)
@@ -239,10 +229,7 @@ static void setDevice (struct sx130xconf* sx130xconf, str_t device) {
     n = snprintf(sx130xconf->boardconf.com_path, sz, "%s", dev);
     if( n > sz-1 )
         LOG(ERROR, "Device string too long (max %d chars): %s", sz-1, dev);
-#elif !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
-    lgw_spi_set_path(dev);
 #endif
-
     rt_free((void*)dev);
 }
 
@@ -267,26 +254,10 @@ static void parse_sx130x_conf (ujdec_t* D, struct sx130xconf* sx130xconf) {
         }
         case J_pps: {
             sx130xconf->pps = uj_bool(D);
-
-#if defined(CFG_sx1302)
-            // Set fine stamping on if PPS is enabled in station.conf configuration.
-            if (sx130xconf->pps == true ) {
-                sx130xconf->ftime.enable = true;
-                sx130xconf->ftime.mode = LGW_FTIME_MODE_ALL_SF;  //loragw_hal.h // fine timestamps for SF5 -> SF12
-
-                if(lgw_ftime_setconf(&sx130xconf->ftime) != LGW_HAL_SUCCESS ) {
-                  LOG(MOD_RAL|ERROR, "Set fine timestamp -> lgw_ftime_setconf() failed.");
-                }
-                LOG(MOD_RAL|INFO, "Fine timestamp %s.",sx130xconf->pps == true?"enabled":"disabled")
-            }
-#endif
-
             break;
         }
         case J_clksrc: {
             sx130xconf->boardconf.clksrc = uj_intRange(D, 0, LGW_RF_CHAIN_NB-1);
-            // MTAC and MTCAP use radio 0 for clock
-            sx130xconf->boardconf.clksrc = 0;
             break;
         }
 #if defined(CFG_sx1302)
@@ -294,30 +265,13 @@ static void parse_sx130x_conf (ujdec_t* D, struct sx130xconf* sx130xconf) {
             sx130xconf->boardconf.full_duplex = uj_bool(D);
             break;
         }
-        case J_rssi_offset_lbt:{ 
-            sx130xconf->sx1261_cfg.rssi_offset = uj_intRange(D, -128, 127); 
-            break; 
-        }
 #else
         case J_tx_gain_lut: {
             parse_tx_gain_lut(D, &sx130xconf->txlut);
             break;
         }
 #endif
-        case J_tx_dwelltime_lbt: {
-            TX_DWELLTIME_LBT = uj_uint(D);
-            break;
-        }
-        case J_antenna_gain:   {
-            float gain = uj_num(D);
-            if (gain != 0.0) {
-                LOG(MOD_RAL|WARNING, "ANT GAIN=%fdBi", gain);
-                sx130xconf->txpowAdjust = (s2_t)(gain*TXPOW_SCALE);
-            }
-            break;
-        }
         case J_chan_FSK: {
-
             parse_ifconf(D, &sx130xconf->ifconf[LGW_MULTI_NB+1]);
             break;
         }
@@ -340,7 +294,7 @@ static void parse_sx130x_conf (ujdec_t* D, struct sx130xconf* sx130xconf) {
                 parse_rfconf(D, sx130xconf, n);
                 break;
             }
-            LOG(MOD_RAL|WARNING, "[parse_sx130x] Ignoring unsupported/unknown field: %s", D->field.name);
+            LOG(MOD_RAL|WARNING, "Ignoring unsupported/unknown field: %s", D->field.name);
             uj_skipValue(D);
             break;
         }
@@ -379,7 +333,7 @@ static int find_sx130x_conf (str_t filename, struct sx130xconf* sx130xconf) {
             break;
         }
         default: {
-            LOG(MOD_RAL|WARNING, "[find_sx130x] Ignoring unsupported/unknown field: %s", D.field.name);
+            LOG(MOD_RAL|WARNING, "Ignoring unsupported/unknown field: %s", D.field.name);
             uj_skipValue(&D);
             break;
         }
@@ -391,54 +345,47 @@ static int find_sx130x_conf (str_t filename, struct sx130xconf* sx130xconf) {
     return 1;
 }
 
-static void dump_lbtConf (struct sx130xconf* sx130xconf) {
+
+static void dump_lbtConf (struct sx130xconf* sx130xconf);
+
+static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region, lbt_config_t* lbt_config) {
 #if !defined(CFG_sx1302)
-    if( sx130xconf->lbt.enable ) {
-        LOG(MOD_RAL|INFO, "SX130x LBT enabled: rssi_target=%d rssi_offset=%d",
-            sx130xconf->lbt.rssi_target, sx130xconf->lbt.rssi_offset);
-        for( int i=0; i < sx130xconf->lbt.nb_channel; i++ ) {
-            LOG(MOD_RAL|INFO, "  %2d: freq=%F scan=%dus",
-                i, sx130xconf->lbt.channels[i].freq_hz, sx130xconf->lbt.channels[i].scan_time_us);
-        }
-    } else {
-        LOG(MOD_RAL|INFO, "SX130x LBT not enabled");
-    }
-    log_flushIO();
-#else
-    if( sx130xconf->sx1261_cfg.lbt_conf.enable ) {
-        LOG(MOD_RAL|INFO, "SX130x LBT enabled: rssi_target=%d rssi_offset=%d",
-            sx130xconf->sx1261_cfg.lbt_conf.rssi_target, sx130xconf->sx1261_cfg.rssi_offset);
-        LOG(MOD_RAL|INFO, "Packet time-on-air limit: %d ms", TX_DWELLTIME_LBT);
-        for( int i=0; i < sx130xconf->sx1261_cfg.lbt_conf.nb_channel; i++ ) {
-            LOG(MOD_RAL|INFO, "  %2d: freq=%F scan=%dus",
-                i, sx130xconf->sx1261_cfg.lbt_conf.channels[i].freq_hz, sx130xconf->sx1261_cfg.lbt_conf.channels[i].scan_time_us);
-        }
-    } else {
-        LOG(MOD_RAL|INFO, "SX130x LBT not enabled");
-    }
-    log_flushIO();
-#endif
-}
-
-static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
-#if !defined(CFG_sx1302) // For now sx1302 does not support CCA
     u2_t scantime_us = 0;
+    s1_t rssi_target = -80;
 
-    if( cca_region == J_AS923_1 ) {
+    // Set region defaults
+    if( cca_region == J_AS923_1 || cca_region == J_AS923_2 || 
+        cca_region == J_AS923_3 || cca_region == J_AS923_4 ) {
         scantime_us = 5000;
-        sx130xconf->lbt.rssi_target = -80;
+        rssi_target = -80;
     }
     else if( cca_region == J_KR920 ) {
         scantime_us = 5000;
-        sx130xconf->lbt.rssi_target = -67;
+        rssi_target = -67;
     }
     else {
         LOG(MOD_RAL|ERROR, "Failed to setup CCA/LBT for region (crc=0x%08X)", cca_region);
         return 0;
     }
-    // By default use up link frequencies as LBT frequencies
-    // Otherwise we should have gotten a freq list from the server
-    if( sx130xconf->lbt.nb_channel == 0 ) {
+
+    // Apply LNS-provided RSSI target if specified
+    if( lbt_config && lbt_config->rssi_target != 0 )
+        rssi_target = lbt_config->rssi_target;
+    sx130xconf->lbt.rssi_target = rssi_target;
+
+    // Apply LNS-provided LBT channels if specified
+    if( lbt_config && lbt_config->nb_channel > 0 ) {
+        int max_channels = min(lbt_config->nb_channel, LBT_CHANNEL_FREQ_NB);
+        for( int i=0; i < max_channels; i++ ) {
+            sx130xconf->lbt.channels[i].freq_hz = lbt_config->channels[i].freq_hz;
+            sx130xconf->lbt.channels[i].scan_time_us = 
+                lbt_config->channels[i].scan_time_us ? lbt_config->channels[i].scan_time_us : scantime_us;
+        }
+        sx130xconf->lbt.nb_channel = max_channels;
+        LOG(MOD_RAL|INFO, "Using %d LBT channels from LNS configuration", max_channels);
+    }
+    // Otherwise derive from uplink channels (existing behavior)
+    else if( sx130xconf->lbt.nb_channel == 0 ) {
         for( int rfi=0; rfi < LGW_RF_CHAIN_NB; rfi++ ) {
             if( !sx130xconf->rfconf[rfi].enable )
                 continue;
@@ -448,16 +395,14 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
                 if( !sx130xconf->ifconf[ifi].enable )
                     continue;
                 if( sx130xconf->lbt.nb_channel < LBT_CHANNEL_FREQ_NB ) {
-                    cfreq = sx130xconf->rfconf[sx130xconf->ifconf[ifi].rf_chain].freq_hz;
                     u4_t freq = cfreq + sx130xconf->ifconf[ifi].freq_hz;
                     sx130xconf->lbt.channels[sx130xconf->lbt.nb_channel].freq_hz = freq;
+                    sx130xconf->lbt.channels[sx130xconf->lbt.nb_channel].scan_time_us = scantime_us;
                     sx130xconf->lbt.nb_channel += 1;
                 }
             }
         }
     }
-    for( int i=0; i<sx130xconf->lbt.nb_channel; i++ )
-        sx130xconf->lbt.channels[i].scan_time_us = scantime_us;
     sx130xconf->lbt.enable = 1;
 
     dump_lbtConf(sx130xconf);
@@ -467,36 +412,56 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
         LOG(MOD_RAL|ERROR, "lgw_lbt_setconf failed: %s", sx130xconf->device);
         return 0;
     }
-#else
-
+#else // SX1302/SX1303 LBT support using SX1261 radio
     u2_t scantime_us = 0;
+    s1_t rssi_target = -80;
     sx130xconf->sx1261_cfg.enable = true;
 
-    /*
-        based off sx1301 spidev choose sx1261 spidev
-    */
+    // Based on sx130x spidev choose sx1261 spidev
     if (strcmp(sx130xconf->device, "/dev/spidev0.0") == 0) {
         strcpy(sx130xconf->sx1261_cfg.spi_path, "/dev/spidev0.1");
     } else if (strcmp(sx130xconf->device, "/dev/spidev1.0") == 0) {
         strcpy(sx130xconf->sx1261_cfg.spi_path, "/dev/spidev1.1");
     }
 
-    if( cca_region == J_AS923_1 ) {
+    // Set region defaults
+    if( cca_region == J_AS923_1 || cca_region == J_AS923_2 || 
+        cca_region == J_AS923_3 || cca_region == J_AS923_4 ) {
         scantime_us = 5000;
-        sx130xconf->sx1261_cfg.lbt_conf.rssi_target = -80;
+        rssi_target = -80;
     }
     else if( cca_region == J_KR920 ) {
         scantime_us = 5000;
-        sx130xconf->sx1261_cfg.lbt_conf.rssi_target = -67;
+        rssi_target = -67;
     }
     else {
         LOG(MOD_RAL|ERROR, "Failed to setup CCA/LBT for region (crc=0x%08X)", cca_region);
         return 0;
     }
 
-    if( sx130xconf->sx1261_cfg.lbt_conf.nb_channel == 0 ) {
+    // Apply LNS-provided RSSI target if specified
+    if( lbt_config && lbt_config->rssi_target != 0 )
+        rssi_target = lbt_config->rssi_target;
+    sx130xconf->sx1261_cfg.lbt_conf.rssi_target = rssi_target;
+
+    // Apply LNS-provided LBT channels if specified
+    if( lbt_config && lbt_config->nb_channel > 0 ) {
+        int max_channels = min(lbt_config->nb_channel, LGW_LBT_CHANNEL_NB_MAX);
+        for( int i=0; i < max_channels; i++ ) {
+            sx130xconf->sx1261_cfg.lbt_conf.channels[i].freq_hz = lbt_config->channels[i].freq_hz;
+            sx130xconf->sx1261_cfg.lbt_conf.channels[i].scan_time_us = 
+                lbt_config->channels[i].scan_time_us ? lbt_config->channels[i].scan_time_us : scantime_us;
+            sx130xconf->sx1261_cfg.lbt_conf.channels[i].bandwidth = 
+                lbt_config->channels[i].bandwidth ? lbt_config->channels[i].bandwidth : BW_125KHZ;
+            sx130xconf->sx1261_cfg.lbt_conf.channels[i].transmit_time_ms = 4000; // TX dwell time
+        }
+        sx130xconf->sx1261_cfg.lbt_conf.nb_channel = max_channels;
+        LOG(MOD_RAL|INFO, "Using %d LBT channels from LNS configuration", max_channels);
+    }
+    // Otherwise derive from uplink channels (existing behavior)
+    else if( sx130xconf->sx1261_cfg.lbt_conf.nb_channel == 0 ) {
         u4_t cfreq = 0;
-        int n = max(8,LGW_IF_CHAIN_NB);  
+        int n = max(8, LGW_IF_CHAIN_NB);
 
         for( int ifi=0; ifi < n; ifi++ ) {
             if( !sx130xconf->ifconf[ifi].enable )
@@ -512,212 +477,26 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
                 if (bw < BW_500KHZ) {
                     sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].freq_hz = freq;
                     sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].bandwidth = bw;
+                    sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].scan_time_us = scantime_us;
+                    sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].transmit_time_ms = 4000;
                     sx130xconf->sx1261_cfg.lbt_conf.nb_channel += 1;
                 }
             }
         }
     }
-    for( int i=0; i<sx130xconf->sx1261_cfg.lbt_conf.nb_channel; i++ ) {
-        sx130xconf->sx1261_cfg.lbt_conf.channels[i].scan_time_us = scantime_us;   
-        sx130xconf->sx1261_cfg.lbt_conf.channels[i].transmit_time_ms = TX_DWELLTIME_LBT;
-    }
-
     sx130xconf->sx1261_cfg.lbt_conf.enable = true;
 
     dump_lbtConf(sx130xconf);
 
-    int e = lgw_sx1261_setconf(&(sx130xconf->sx1261_cfg));
+    int e = lgw_sx1261_setconf(&sx130xconf->sx1261_cfg);
     if( e != LGW_HAL_SUCCESS ) {
         LOG(MOD_RAL|ERROR, "lgw_sx1261_setconf failed: %s", sx130xconf->device);
         return 0;
     }
-
 #endif // !defined(CFG_sx1302)
     return 1;
 }
 
-static void parse_lutconf(ujdec_t* D, struct lgw_tx_alt_gain_s* tx_alt_gain) {
-    ujcrc_t field;
-    uj_enterObject(D);
-    while( (field = uj_nextField(D)) ) {
-        switch(field) {
-        case J_rf_power: {
-            tx_alt_gain->rf_power = uj_intRange(D, 0, 30);
-            break;
-        }
-         case J_pa_gain: {
-            tx_alt_gain->pa_gain = uj_intRange(D, 0, 3);
-            break;
-        }
-         case J_mix_gain: {
-            tx_alt_gain->mix_gain = uj_intRange(D, 8, 15);
-            break;
-        }
-         case J_dig_gain: {
-            uj_skipValue(D);
-            break;
-        }
-        default: {
-            LOG(MOD_RAL|WARNING, "[LUTCONF] Ignoring unsupported/unknown field: %s", D->field.name);
-            uj_skipValue(D);
-            break;
-        }
-        }
-    }
-    tx_alt_gain->dig_gain = 0;
-    tx_alt_gain->dac_gain = 3;
-    uj_exitObject(D);
-}
-
-static void parse_lutarray(ujdec_t* D, int n, struct lgw_tx_alt_gain_lut_s* tx_alt_gain_lut) {
-
-    int slot;
-    uj_enterArray(D);
-    while( (slot = uj_nextSlot(D)) >= 0 ) {
-        tx_alt_gain_lut->dig_gain[slot] = uj_num(D);
-    }
-
-    tx_alt_gain_lut->temp = n;
-    tx_alt_gain_lut->size = 64;
-    uj_exitArray(D);
-}
-
-static void parse_sx130x_tcomp_conf (ujdec_t* D, struct lgw_tx_temp_lut_s* temp_lut_s) {
-
-    ujcrc_t field;
-    uj_enterObject(D);
-    int lut_index = 0;
-    while( (field = uj_nextField(D)) ) {
-        switch(field) {
-        case J_LUT_BASE: {
-            uj_enterObject(D);
-            break;
-        }
-        default: {
-            int n = uj_indexedField(D, "tx_lut_");
-            if( n >= 0 ) {
-                parse_lutconf(D, &temp_lut_s->lut[n]);
-                if (n == 15)
-                    uj_exitObject(D);
-                break;
-            }
-            n = uj_indexedField(D, "LUT-");
-            if( n >= 0 ) {
-                // Read json array
-                parse_lutarray(D, -n, &temp_lut_s->dig[lut_index++]);
-                temp_lut_s->size++;
-                break;
-            }
-            n = uj_indexedField(D, "LUT");
-            if( n >= 0 ) {
-                // Read json array
-                parse_lutarray(D, n, &temp_lut_s->dig[lut_index++]);
-                temp_lut_s->size++;
-                break;
-            }
-            LOG(MOD_RAL|WARNING, "[TCOMP] Ignoring unsupported/unknown field: %s", D->field.name);
-            uj_skipValue(D);
-            break;
-        }
-        }
-    }
-    uj_exitObject(D);
-}
-
-static int find_sx130x_tcomp_conf (str_t filename, struct lgw_tx_temp_lut_s* tx_temp_lut) {
-    dbuf_t jbuf = sys_readFile(filename);
-    if( jbuf.buf == NULL )
-        return 0;
-    ujdec_t D;
-    uj_iniDecoder(&D, jbuf.buf, jbuf.bufsize);
-    if( uj_decode(&D) ) {
-        LOG(MOD_RAL|ERROR, "Parsing of JSON failed - '%s' ignored", filename);
-        free(jbuf.buf);
-        return 0;
-    }
-
-    parse_sx130x_tcomp_conf(&D, tx_temp_lut);
-
-    uj_assertEOF(&D);
-    rt_free(jbuf.buf);
-    return 1;
-}
-
-int sx130xconf_parse_tcomp (struct sx130xconf* sx130xconf, int slaveIdx,
-                            str_t hwspec, char* json, int jsonlen) {
-    if( strcmp(hwspec, "sx1301/1") != 0 ) {
-        LOG(MOD_RAL|ERROR, "Unsupported hwspec: %s", hwspec);
-        return 0;
-    }
-
-    if( !find_sx130x_tcomp_conf("temp_lut.json", &sx130xconf->tx_temp_lut)) {
-        sx130xconf->tx_temp_lut.temp_comp_enabled = false;
-        return 1;
-    }
-
-    sx130xconf->tx_temp_lut.temp_comp_enabled = true;
-    return 1;
-}
-
-
-void lookup_power_settings(void* ctx, float tx_pwr, int8_t* rf_power, int8_t* dig_gain) {
-    float min_diff = 99;
-
-    if( ctx == NULL ) return;
-    struct lgw_tx_temp_lut_s* tx_temp_lut = (struct lgw_tx_temp_lut_s*)ctx;
-
-    for (int i = 0; i < tx_temp_lut->size; i++) {
-        // If the current temp is lower than the first temp or we reach the end of the table
-        if ((tx_temp_lut->dig[0].temp > tx_temp_lut->temp_comp_value || i == tx_temp_lut->size-1) ||
-            (tx_temp_lut->dig[i].temp <= tx_temp_lut->temp_comp_value && tx_temp_lut->dig[i+1].temp > tx_temp_lut->temp_comp_value)) {
-            for (int j = 0; j < TX_GAIN_LUT_SIZE_MAX; j++) {
-                for (int h = 0; h < 4; h++) {
-                    if (tx_pwr >= tx_temp_lut->dig[i].dig_gain[j*4+h] && (tx_pwr - tx_temp_lut->dig[i].dig_gain[j*4+h]) < min_diff) {
-                        min_diff = (tx_pwr - tx_temp_lut->dig[i].dig_gain[j*4+h]);
-                        *rf_power = j;
-                        *dig_gain = h;
-                    }
-                }
-            }
-            break;
-        }
-    }
-
-    if (min_diff == 99) {
-        // minimum output if no match was found
-        *rf_power = 0;
-        *dig_gain = 3;
-    }
-}
-
-void update_temp_comp_value(void* ctx) {
-    if( ctx == NULL ) return;
-    struct lgw_tx_temp_lut_s* tx_temp_lut = (struct lgw_tx_temp_lut_s*)ctx;
-
-    if (!tx_temp_lut->temp_comp_enabled) {
-        return;
-    }
-
-    /* try to open file to read */
-    FILE *filePointer;
-
-    if ((filePointer = fopen(tx_temp_lut->temp_comp_file, "r"))) {
-        int bufferLength = 10;
-        char buffer[bufferLength];
-
-        fgets(buffer, bufferLength, filePointer);
-
-        tx_temp_lut->temp_comp_value = atoi(buffer);
-
-        if (tx_temp_lut->temp_comp_file_type == 0) {
-            // SENSOR provides a mC reading
-            tx_temp_lut->temp_comp_value = ((tx_temp_lut->temp_comp_value % 1000) >= 500 ? 1 : 0) + (tx_temp_lut->temp_comp_value / 1000);
-        }
-
-        fclose(filePointer);
-    }
-
-}
 
 int sx130xconf_parse_setup (struct sx130xconf* sx130xconf, int slaveIdx,
                             str_t hwspec, char* json, int jsonlen) {
@@ -725,17 +504,9 @@ int sx130xconf_parse_setup (struct sx130xconf* sx130xconf, int slaveIdx,
         LOG(MOD_RAL|ERROR, "Unsupported hwspec: %s", hwspec);
         return 0;
     }
-
+    // Zero and setup some defaults
     memset(sx130xconf, 0, sizeof(*sx130xconf));
-
-    // set non zero defaults
     sx130xconf->boardconf.lorawan_public = 1;
-
-#if defined(CFG_sx1302)
-    // set default rssi offset for MTCAP3/MTAC-003
-    sx130xconf->sx1261_cfg.rssi_offset = 8;
-#endif
-
     setDevice(sx130xconf, NULL);
 
     if( !find_sx130x_conf("station.conf", sx130xconf) )
@@ -755,7 +526,6 @@ int sx130xconf_parse_setup (struct sx130xconf* sx130xconf, int slaveIdx,
     }
     parse_sx130x_conf(&D, sx130xconf);
     uj_assertEOF(&D);
-
     return 1;
 }
 
@@ -941,13 +711,40 @@ static void dump_ifConf (int chain, struct lgw_conf_rxrf_s rfconfs[LGW_RF_CHAIN_
     log_flushIO();
 }
 
+static void dump_lbtConf (struct sx130xconf* sx130xconf) {
+#if !defined(CFG_sx1302)
+    if( sx130xconf->lbt.enable ) {
+        LOG(MOD_RAL|INFO, "SX130x LBT enabled: rssi_target=%d rssi_offset=%d",
+            sx130xconf->lbt.rssi_target, sx130xconf->lbt.rssi_offset);
+        for( int i=0; i < sx130xconf->lbt.nb_channel; i++ ) {
+            LOG(MOD_RAL|INFO, "  %2d: freq=%F scan=%dus",
+                i, sx130xconf->lbt.channels[i].freq_hz, sx130xconf->lbt.channels[i].scan_time_us);
+        }
+    } else {
+        LOG(MOD_RAL|INFO, "SX130x LBT not enabled");
+    }
+#else
+    if( sx130xconf->sx1261_cfg.lbt_conf.enable ) {
+        LOG(MOD_RAL|INFO, "SX1302 LBT enabled via SX1261: rssi_target=%d rssi_offset=%d",
+            sx130xconf->sx1261_cfg.lbt_conf.rssi_target, sx130xconf->sx1261_cfg.rssi_offset);
+        for( int i=0; i < sx130xconf->sx1261_cfg.lbt_conf.nb_channel; i++ ) {
+            LOG(MOD_RAL|INFO, "  %2d: freq=%F scan=%dus bw=%d",
+                i, sx130xconf->sx1261_cfg.lbt_conf.channels[i].freq_hz, 
+                sx130xconf->sx1261_cfg.lbt_conf.channels[i].scan_time_us,
+                sx130xconf->sx1261_cfg.lbt_conf.channels[i].bandwidth);
+        }
+    } else {
+        LOG(MOD_RAL|INFO, "SX1302 LBT not enabled");
+    }
+#endif
+    log_flushIO();
+}
 
-int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
+
+int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region, lbt_config_t* lbt_config) {
     str_t errmsg = "";
     lgw_stop();
     LOG(MOD_RAL|INFO,"Lora gateway library version: %s", lgw_version_info());
-
-    dump_boardConf(&sx130xconf->boardconf);
 
 #if defined(CFG_linux)
     u4_t pids[1];
@@ -963,122 +760,9 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
     log_flushIO();  // lgw_connect might block - make sure log output is flushed
     lgw_connect(sx130xconf->device);
     sys_usleep(rt_millis(250));
-    // Force a reset because MCU software may be in a weird state when we connect the first time
 #endif
 
-    bool limit_lut_to_26 = false;
-
-    switch(cca_region) {
-        case J_AS923_1:
-        case J_AS923_2:
-        case J_AS923_3:
-        case J_AS923_4: 
-        case J_AU915:
-            limit_lut_to_26 = true;
-            break;
-    };
-
-    if (limit_lut_to_26) {
-        uint8_t extra_entries = 0;
-        for( int i=0; i<sx130xconf->txlut.size; i++ ) {
-            if (sx130xconf->txlut.lut[i].rf_power > 26) {
-                extra_entries++;
-            }
-        }
-        sx130xconf->txlut.size -= extra_entries;
-    }
-
-    if( log_shallLog(MOD_RAL|VERBOSE) ) {
-        LOG(MOD_RAL|DEBUG, "SX130x txlut table (%d entries)", sx130xconf->txlut.size);
-        LOG(MOD_RAL|VERBOSE, "TEMP COMP %sABLED", sx130xconf->tx_temp_lut.temp_comp_enabled ? "EN" : "DIS");
-        for( int i=0; i<sx130xconf->txlut.size; i++ ) {
-#if !defined(CFG_sx1302)
-            if (sx130xconf->tx_temp_lut.temp_comp_enabled) {
-                LOG(MOD_RAL|VERBOSE,
-                    "SX1301 txlut %2d:  dig_gain=%d pa_gain=%d dac_gain=%d mix_gain=%d rf_power=%d", i,
-                    0,
-                    sx130xconf->tx_temp_lut.lut[i].pa_gain,
-                    sx130xconf->tx_temp_lut.lut[i].dac_gain,
-                    sx130xconf->tx_temp_lut.lut[i].mix_gain,
-                    sx130xconf->tx_temp_lut.lut[i].rf_power);
-            } else {
-                LOG(MOD_RAL|VERBOSE,
-                    "SX1301 txlut %2d:  dig_gain=%d pa_gain=%d dac_gain=%d mix_gain=%d rf_power=%d", i,
-                    sx130xconf->txlut.lut[i].dig_gain,
-                    sx130xconf->txlut.lut[i].pa_gain,
-                    sx130xconf->txlut.lut[i].dac_gain,
-                    sx130xconf->txlut.lut[i].mix_gain,
-                    sx130xconf->txlut.lut[i].rf_power);
-            }
-#else
-       LOG(MOD_RAL|VERBOSE,
-                "SX1302 txlut %2d:  rf_power=%d pa_gain=%d pwr_idx=%d", i,
-                sx130xconf->txlut.lut[i].rf_power,
-                sx130xconf->txlut.lut[i].pa_gain,
-                sx130xconf->txlut.lut[i].pwr_idx);
-#endif
-            log_flushIO();
-        }
-#if defined(CFG_sx1302)
-        LOG(MOD_RAL|VERBOSE, "SX1302 rssi_tcomp: coeff_a=%.03f coeff_b=%.03f coeff_c=%.03f coeff_d=%.03f coeff_e=%.03f\n",
-            sx130xconf->rfconf->rssi_tcomp.coeff_a,
-            sx130xconf->rfconf->rssi_tcomp.coeff_b,
-            sx130xconf->rfconf->rssi_tcomp.coeff_c,
-            sx130xconf->rfconf->rssi_tcomp.coeff_d,
-            sx130xconf->rfconf->rssi_tcomp.coeff_e);
-#endif
-        for( int i=0; i<LGW_RF_CHAIN_NB; i++ ) {
-            LOG(MOD_RAL|VERBOSE,
-#if defined(CFG_sx1302)
-                "SX1302 rxrfchain %d: enable=%d freq=%F rssi_offset=%f type=%d tx_enable=%d", i,
-#else
-                "SX1301 rxrfchain %d: enable=%d freq=%F rssi_offset=%f type=%d tx_enable=%d tx_notch_freq=%d", i,
-#endif
-                sx130xconf->rfconf[i].enable,
-                sx130xconf->rfconf[i].freq_hz,
-                sx130xconf->rfconf[i].rssi_offset,
-                sx130xconf->rfconf[i].type,
-                sx130xconf->rfconf[i].tx_enable
-#if !defined(CFG_sx1302)
-                , sx130xconf->rfconf[i].tx_notch_freq
-#endif
-                );
-        }
-        for( int i=0; i<LGW_IF_CHAIN_NB; i++ ) {
-#if !defined(CFG_sx1302)
-            LOG(MOD_RAL|VERBOSE,
-                "SX1301 ifchain %2d: enable=%d rf_chain=%d freq=%d bandwidth=%d datarate=%d sync_word=%lX/%d", i,
-                sx130xconf->ifconf[i].enable,
-                sx130xconf->ifconf[i].rf_chain,
-                sx130xconf->ifconf[i].freq_hz,
-                sx130xconf->ifconf[i].bandwidth,
-                sx130xconf->ifconf[i].datarate,
-                sx130xconf->ifconf[i].sync_word, sx130xconf->ifconf[i].sync_word_size);
-#else
-	    if(i == LGW_MULTI_NB){
-                LOG(MOD_RAL|VERBOSE,
-                    "SX1302 ifchain %2d: enable=%d rf_chain=%d freq=%d bw=%d SF=%d sync_word=%lX/%d [STD] %s", i,
-                    sx130xconf->ifconf[i].enable,
-                    sx130xconf->ifconf[i].rf_chain,
-                    sx130xconf->ifconf[i].freq_hz,
-                    sx130xconf->ifconf[i].bandwidth,
-                    sx130xconf->ifconf[i].datarate,
-                    sx130xconf->ifconf[i].sync_word, sx130xconf->ifconf[i].sync_word_size,
-                    (sx130xconf->ifconf[i].implicit_hdr == true) ? "Implicit header" : "Explicit header");
-            }else{
-                LOG(MOD_RAL|VERBOSE,
-                    "SX1302 ifchain %2d: enable=%d rf_chain=%d freq=%d bw=%d SF=%d sync_word=%lX/%d", i,
-                    sx130xconf->ifconf[i].enable,
-                    sx130xconf->ifconf[i].rf_chain,
-                    sx130xconf->ifconf[i].freq_hz,
-                    sx130xconf->ifconf[i].bandwidth,
-                    sx130xconf->ifconf[i].datarate,
-                    sx130xconf->ifconf[i].sync_word, sx130xconf->ifconf[i].sync_word_size);
-            }
-#endif
-        }
-    }
-
+    dump_boardConf(&sx130xconf->boardconf);
 #if defined(CFG_sx1302)
     if( lgw_board_setconf(&sx130xconf->boardconf) != LGW_HAL_SUCCESS ) {
 #else
@@ -1092,19 +776,7 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
 #if defined(CFG_sx1302)
         if( lgw_txgain_setconf(0, &sx130xconf->txlut) != LGW_HAL_SUCCESS ) {
 #else
-
-        if (sx130xconf->tx_temp_lut.temp_comp_enabled) {
-            for (int i = 0; i < 16; i++) {
-                sx130xconf->txlut.lut[i].rf_power = sx130xconf->tx_temp_lut.lut[i].rf_power;
-                sx130xconf->txlut.lut[i].pa_gain = sx130xconf->tx_temp_lut.lut[i].pa_gain;
-                sx130xconf->txlut.lut[i].mix_gain = sx130xconf->tx_temp_lut.lut[i].mix_gain;
-                sx130xconf->txlut.lut[i].dig_gain = sx130xconf->tx_temp_lut.lut[i].dig_gain;
-                sx130xconf->txlut.lut[i].dac_gain = sx130xconf->tx_temp_lut.lut[i].dac_gain;
-            }
-            sx130xconf->txlut.size = 16;
-        }
-
-        if(lgw_txgain_setconf(&sx130xconf->txlut) != LGW_HAL_SUCCESS ) {
+        if( lgw_txgain_setconf(&sx130xconf->txlut) != LGW_HAL_SUCCESS ) {
 #endif
             errmsg = "lgw_txgain_setconf";
             goto fail;
@@ -1136,7 +808,7 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
     }
 
     dump_lbtConf(sx130xconf);
-    if( cca_region && !setup_LBT(sx130xconf, cca_region) ) {
+    if( cca_region && !setup_LBT(sx130xconf, cca_region, lbt_config) ) {
         errmsg = "setup_LBT";
         goto fail;
     }
@@ -1146,20 +818,10 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
         sx130xconf->boardconf.com_type == LGW_COM_USB ? "usb" : "spi",
         sx130xconf->device, sx130xconf->pps ? "en":"dis"
     );
-
-    if (sx130xconf->boardconf.com_type == LGW_COM_SPI) {
-        /* Board reset */
-        if (reset_lgw_start() != LGW_HAL_SUCCESS) {
-            errmsg = "lgw_reset";
-            goto fail;
-        }
-    }
-    // (void) sys_deviceMode; // TODO: Add device mode to sx1302 hal
+    (void) sys_deviceMode; // TODO: Add device mode to sx1302 hal
 #else
-#if !defined(CFG_prod)
     LOG(MOD_RAL|INFO, "Station device: %s (PPS capture %sabled)", sx130xconf->device, sx130xconf->pps ? "en":"dis");
     lgwx_device_mode = sys_deviceMode;
-#endif
 #endif
     log_flushIO();  // flush output since lgw_start may block for quite some time on some concentrators
 

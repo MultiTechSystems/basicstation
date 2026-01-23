@@ -32,6 +32,14 @@
 #include "tc.h"
 #include "timesync.h"
 #include "ral.h"
+#if defined(CFG_sx1302) || defined(CFG_gps_recovery)
+#if defined(CFG_lgwsim)
+// Mock declaration for simulation builds
+int sx1302_gps_enable(int enable);
+#else
+#include "lgw/loragw_sx1302.h"
+#endif
+#endif
 
 #if defined(CFG_smtcpico)
 #define _MAX_DT 300
@@ -53,8 +61,8 @@
 #define MAX_MCU_DRIFT_THRES   _MAX_DT*iPPM_SCALE   // deviation in deci ppm
 #define MAX_PPS_ERROR         1000  // deviation in micros
 #define MAX_PPS_OFFSET_CHANGE  50  // update if more than this
-#define NO_PPS_RESET_THRES     90  // seconds
-#define NO_PPS_RESET_FAIL_THRES 6  // reset after X resets
+#define NO_PPS_RESET_THRES     90  // seconds - reset GPS if PPS lost this long
+#define NO_PPS_RESET_FAIL_THRES 6  // restart after this many resets
 #define NO_PPS_ALARM_INI       10  // seconds
 #define NO_PPS_ALARM_RATE     2.0  // growth rate alarm threshold
 #define NO_PPS_ALARM_MAX     3600  // seconds
@@ -97,6 +105,12 @@ static u1_t        wsBufFull;
 static int         syncQual[N_SYNC_QUAL];
 static int         syncQual_widx;
 static int         syncQual_thres;  // current threshold
+
+#if defined(CFG_sx1302) || defined(CFG_gps_recovery)
+// Configurable thresholds for GPS/PPS recovery (can be set via env vars for testing)
+static int         cfg_pps_reset_thres = NO_PPS_RESET_THRES;
+static int         cfg_pps_reset_fail_thres = NO_PPS_RESET_FAIL_THRES;
+#endif
 
 // Fwd decl
 static void onTimesyncLns (tmr_t* tmr);
@@ -167,14 +181,14 @@ static int log_drift_stats (str_t msg, int* drifts, int thresQ, int* auxQ) {
 
 
 ustime_t ts_normalizeTimespanMCU (ustime_t timespan) {
-
-
+    
+    
     return (ustime_t)round(timespan / decodeDriftPPM((double)sum_mcu_drifts / N_DRIFTS));
     return (ustime_t)round( timespan / (1.0 + sum_mcu_drifts / (PPM*iPPM_SCALE) / N_DRIFTS) );
 }
 
 ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
-#if defined(CFG_sx1302)
+#if defined(CFG_sx1302) || defined(CFG_gps_recovery)
     static sL_t last_pps_reset = 0;
     static u1_t last_pps_reset_cnt = 0;
 #endif
@@ -201,34 +215,10 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
         *last = *curr;
         return TIMESYNC_RADIO_INTV;
     }
-    // Detect session change (slave restart) - reset state for this txunit
-    if( ral_xtime2sess(curr->xtime) != ral_xtime2sess(last->xtime) ) {
-        LOG(MOD_SYN|INFO, "SX130X#%d session changed: %d -> %d (slave restart?)",
-            txunit, ral_xtime2sess(last->xtime), ral_xtime2sess(curr->xtime));
-        // Reset drift stats for this txunit
-        struct txunit_stats* stats = &txunit_stats[txunit];
-        memset(stats->mcu_drifts, 0, sizeof(stats->mcu_drifts));
-        stats->mcu_drifts_widx = 0;
-        stats->excessive_drift_cnt = 0;
-        stats->drift_thres = MAX_MCU_DRIFT_THRES;
-        if( txunit == 0 ) {
-            // Primary txunit session changed - reset PPS/GPS sync state
-            // to avoid comparing xtimes from different sessions
-            sum_mcu_drifts = 0;
-            memset(&ppsSync, 0, sizeof(ppsSync));
-            ppsOffset = -1;
-            gpsOffset = 0;
-            no_pps_thres = NO_PPS_ALARM_INI;
-            pps_drifts_widx = 0;
-            LOG(MOD_SYN|WARNING, "Primary slave restarted - PPS/GPS sync reset, will re-acquire");
-        }
-        *last = *curr;
-        return TIMESYNC_RADIO_INTV;
-    }
     ustime_t dus = curr->ustime - last->ustime;
     sL_t dxc = curr->xtime - last->xtime;
     if( dxc <= 0 ) {
-        LOG(MOD_SYN|ERROR, "SX130X#%d trigger count not ticking or weird value: 0x%lX .. 0x%lX (dxc=%ld)",
+        LOG(MOD_SYN|ERROR, "SX130X#%d trigger count not ticking or weird value: 0x%lX .. 0x%lX (dxc=%d)",
             txunit, last->xtime, curr->xtime, dxc);
         return TIMESYNC_RADIO_INTV;
     }
@@ -242,8 +232,10 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
         sum_mcu_drifts += drift_ppm - stats->mcu_drifts[stats->mcu_drifts_widx];
     stats->mcu_drifts[stats->mcu_drifts_widx] = drift_ppm;
     stats->mcu_drifts_widx = (stats->mcu_drifts_widx + 1) % N_DRIFTS;
-
     if( stats->mcu_drifts_widx == 0 ) {
+        
+        
+        
         int thres = log_drift_stats("MCU/SX130X drift stats", stats->mcu_drifts, MCU_DRIFT_THRES, NULL);
         stats->drift_thres = max(MIN_MCU_DRIFT_THRES, min(MAX_MCU_DRIFT_THRES, abs(thres)));
         double mean_ppm = decodePPM( ((double)sum_mcu_drifts) / N_DRIFTS);
@@ -253,7 +245,6 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
             rt_utcOffset_ts = curr->ustime;
         }
     }
-    
     if( abs(drift_ppm) > stats->drift_thres ) {
         stats->excessive_drift_cnt += 1;
         if( (stats->excessive_drift_cnt % QUICK_RETRIES) == 0 ) {
@@ -266,7 +257,6 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
             LOG(MOD_SYN|CRITICAL, "Clock drift could not recover, forcing reset");
             exit(EXIT_FAILURE);
         }
-
         return TIMESYNC_RADIO_INTV/2;
     }
     stats->excessive_drift_cnt = 0;
@@ -295,17 +285,19 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
         LOG(MOD_SYN|XDEBUG, "PPS: Rejecting PPS (xtime/pps_xtime spread): curr->xtime=0x%lX   curr->pps_xtime=0x%lX   diff=%lu (>%u)",
             curr->xtime, curr->pps_xtime, curr->xtime - curr->pps_xtime, PPM+TX_MIN_GAP);
 
-#if defined(CFG_sx1302)
-        // PPS Sync is off more than 90s, reset SX1303 gps once every 5s until recovery
-        if ((curr->xtime - curr->pps_xtime) > NO_PPS_RESET_THRES * 1E6
+#if defined(CFG_sx1302) || defined(CFG_gps_recovery)
+        // PPS Sync is off more than cfg_pps_reset_thres seconds, reset SX1302/3 GPS once every 5s until recovery
+        if ((curr->xtime - curr->pps_xtime) > cfg_pps_reset_thres * 1E6
             && (curr->xtime < last_pps_reset || (curr->xtime - last_pps_reset) > 5*1E6)) {
-            sx1302_gps_enable(false);
-            sx1302_gps_enable(true);
+            LOG(MOD_SYN|WARNING, "PPS lost for >%d seconds, attempting GPS reset (attempt %d)",
+                cfg_pps_reset_thres, last_pps_reset_cnt + 1);
+            sx1302_gps_enable(0);
+            sx1302_gps_enable(1);
             last_pps_reset = curr->xtime;
             last_pps_reset_cnt++;
         }
 
-        if (last_pps_reset_cnt > NO_PPS_RESET_FAIL_THRES) {
+        if (last_pps_reset_cnt > cfg_pps_reset_fail_thres) {
             LOG(MOD_SYN|CRITICAL, "XTIME/PPS out-of-sync need restart, forcing reset");
             exit(EXIT_FAILURE);
         }
@@ -318,9 +310,7 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
     if( err > MAX_PPS_ERROR && err < PPM-MAX_PPS_ERROR ) {
         LOG(MOD_SYN|XDEBUG, "PPS: Rejecting PPS (consecutive pps_xtime error): curr->pps_xtime=0x%lX   last->pps_xtime=0x%lX   diff=%lu",
             curr->pps_xtime, last->pps_xtime, curr->pps_xtime - last->pps_xtime);
-
         goto done;  // out of scope - probably no value latched
-
     }
     if( !ppsSync.pps_xtime )
         LOG(MOD_SYN|INFO, "First PPS pulse acquired");
@@ -378,7 +368,7 @@ sL_t ts_gpstime2xtime (u1_t txunit, sL_t gpstime) {
             : !gpsOffset ? "GPS" : "?");
         return 0;
     }
-
+    
     if( timesyncs[0].xtime - ppsSync.pps_xtime > PPS_VALID_INTV ) {
         LOG(MOD_SYN|ERROR, "Failed to convert gpstime to xtime - last PPS sync to old: %~T",
             timesyncs[0].xtime - ppsSync.pps_xtime);
@@ -491,6 +481,20 @@ void ts_iniTimesync () {
     sum_mcu_drifts = 0;
     memset(timesyncs, 0, sizeof(timesyncs));
     rt_clrTimer(&syncLnsTmr);
+
+#if defined(CFG_sx1302) || defined(CFG_gps_recovery)
+    // Allow overriding GPS recovery thresholds via environment variables (for testing)
+    const char* env_pps_reset = getenv("NO_PPS_RESET_THRES");
+    const char* env_pps_fail = getenv("NO_PPS_RESET_FAIL_THRES");
+    if (env_pps_reset) {
+        cfg_pps_reset_thres = atoi(env_pps_reset);
+        LOG(MOD_SYN|INFO, "NO_PPS_RESET_THRES set to %d seconds from environment", cfg_pps_reset_thres);
+    }
+    if (env_pps_fail) {
+        cfg_pps_reset_fail_thres = atoi(env_pps_fail);
+        LOG(MOD_SYN|INFO, "NO_PPS_RESET_FAIL_THRES set to %d from environment", cfg_pps_reset_fail_thres);
+    }
+#endif
 }
 
 

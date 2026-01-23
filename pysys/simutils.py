@@ -46,6 +46,8 @@ class LgwHAL():
         500: BW_500KHZ,
     }
 
+    DR_LORA_SF5  = 0x05  # SX1302/SX1303 only
+    DR_LORA_SF6  = 0x06  # SX1302/SX1303 only
     DR_LORA_SF7  = 0x02
     DR_LORA_SF8  = 0x04
     DR_LORA_SF9  = 0x08
@@ -54,6 +56,8 @@ class LgwHAL():
     DR_LORA_SF12 = 0x40
 
     DR_MAP = {
+        5:  DR_LORA_SF5 ,  # SX1302/SX1303 only
+        6:  DR_LORA_SF6 ,  # SX1302/SX1303 only
         7:  DR_LORA_SF7 ,
         8:  DR_LORA_SF8 ,
         9:  DR_LORA_SF9 ,

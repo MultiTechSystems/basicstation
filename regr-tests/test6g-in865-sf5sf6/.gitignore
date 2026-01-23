@@ -1,0 +1,5 @@
+tc.uri
+*.info
+station.log
+station-ap2.pid
+spidev

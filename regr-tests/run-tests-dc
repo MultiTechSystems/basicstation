@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# --- Revised 3-Clause BSD License ---
+# Copyright Semtech Corporation 2022. All rights reserved.
+#
+# Duty cycle tests: sliding window DC implementation
+# Tests duty_cycle_enabled, duty_cycle_mode, duty_cycle_window, duty_cycle_limits
+
+. $(dirname $0)/run-tests-common
+
+TESTS="test9a-dc-eu868 test9b-dc-as923 test9c-dc-kr920"
+CATEGORY="dc"
+
+run_tests "$@"

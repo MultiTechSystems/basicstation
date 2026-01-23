@@ -127,8 +127,6 @@ static void rx_polling (tmr_t* tmr) {
             resp.freq   = p->freq_hz;
 #if defined(CFG_sx1302)
             resp.rssi  = (u1_t)-p->rssis;
-            // Set fine timestamp on
-            resp.fts = p->ftime_received ? (u4_t)p->ftime : -1;
 #else
             resp.rssi  = (u1_t)-p->rssi;
 #endif
@@ -180,7 +178,7 @@ static void pipe_read (aio_t* aio) {
                 struct ral_response* resp = (struct ral_response*)req;
                 u1_t ret=TXSTATUS_IDLE, status;
 #if defined(CFG_sx1302)
-                int err = lgw_status(0, TX_STATUS, &status);
+                int err = lgw_status(0, TX_STATUS, &status);  
 #else
                 int err = lgw_status(TX_STATUS, &status);
 #endif
@@ -194,7 +192,7 @@ static void pipe_read (aio_t* aio) {
             else if( n >= off + sizeof(struct ral_txabort_req) && req->cmd == RAL_CMD_TXABORT) {
                 off += sizeof(struct ral_txabort_req);
 #if defined(CFG_sx1302)
-                lgw_abort_tx(0);
+                lgw_abort_tx(0); 
 #else
                 lgw_abort_tx();
 #endif
@@ -213,7 +211,7 @@ static void pipe_read (aio_t* aio) {
                 pkt_tx.invert_pol = true;
                 pkt_tx.no_header  = false;
 
-                if( (txreq->rps & RPS_BCN) ) {
+                if( (txreq->rps & RPS_BCN) ) {  
                     pkt_tx.tx_mode = ON_GPS;
                     pkt_tx.preamble = 10;
                     pkt_tx.invert_pol = false;
@@ -244,11 +242,7 @@ static void pipe_read (aio_t* aio) {
                 u1_t ret = RAL_TX_OK;
                 if( err == LGW_HAL_SUCCESS ) {
                     ret = RAL_TX_OK;
-#if defined(CFG_sx1302)
-                } else if( err == LGW_LBT_NOT_ALLOWED ) {
-#else
                 } else if( err == LGW_LBT_ISSUE ) {
-#endif
                     ret = RAL_TX_NOCA;
                 } else {
                     LOG(MOD_RAL|ERROR, "lgw_send failed");
@@ -262,25 +256,17 @@ static void pipe_read (aio_t* aio) {
                 off += sizeof(struct ral_config_req);
                 struct ral_config_req* confreq = (struct ral_config_req*)req;
                 struct sx130xconf sx1301conf;
-                memset(&sx1301conf, 0, sizeof(struct sx130xconf));
-
-                // set default antenna gain to 3.0 dBi
-                LOG(MOD_RAL|INFO, "Set default antenna gain to 3.0 dBi");
-                sx1301conf.txpowAdjust = 3.0 * TXPOW_SCALE;
-
                 int status = 0;
                 // Note: sx1301conf_start can take considerable amount of time (if LBT on up to 8s!!)
                 if( (status = !sx130xconf_parse_setup(&sx1301conf, sys_slaveIdx, confreq->hwspec, confreq->json, confreq->jsonlen)) ||
                     (status = !sx130xconf_challoc(&sx1301conf, &confreq->upchs)   << 1) ||
-                    (status = !sys_runRadioInit(sx1301conf.device)                << 2) )
+                    (status = !sys_runRadioInit(sx1301conf.device)                << 2) ||
+                    (status = !sx130xconf_start(&sx1301conf, confreq->region, NULL) << 3) )
                     rt_fatal("Slave radio start up failed with status 0x%02x", status);
-                // With gpsd integration, all cards can have independent GPS/PPS capability
-                // Each slave process connects to gpsd independently
                 if( sx1301conf.pps && sys_slaveIdx ) {
-                    LOG(MOD_RAL|INFO, "PPS enabled for slave#%d (multi-card PPS via gpsd)", sys_slaveIdx);
+                    LOG(MOD_RAL|ERROR, "Only slave#0 may have PPS enabled");
+                    sx1301conf.pps = 0;
                 }
-                if( (status = !sx130xconf_start(&sx1301conf, confreq->region) << 3) )
-                    rt_fatal("Slave radio start up failed with status 0x%02x", status);
                 pps_en = sx1301conf.pps;
                 region = confreq->region;
                 txpowAdjust = sx1301conf.txpowAdjust;

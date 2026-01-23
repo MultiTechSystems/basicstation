@@ -311,7 +311,7 @@ static void rxpolling (tmr_t* tmr) {
     rt_setTimer(tmr, rt_micros_ahead(RX_POLL_INTV));
 }
 
-int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs) {
+int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs, lbt_config_t* lbt_config) {
     struct sx1301v2conf sx1301v2conf;
     if( !sx1301v2conf_parse_setup(&sx1301v2conf, -1, hwspec, json, jsonlen) )
         return 0;
@@ -357,7 +357,7 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
 
     if( !sys_runRadioInit(sx1301v2conf.boards[0].device) ||
         !sx1301v2conf_challoc(&sx1301v2conf, upchs) ||
-        !sx1301v2conf_start(&sx1301v2conf, cca_region) ) {
+        !sx1301v2conf_start(&sx1301v2conf, cca_region, lbt_config) ) {
         goto errexit;
     }
     // Radio started

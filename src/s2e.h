@@ -41,16 +41,17 @@ int  s2e_parse_lora_frame(ujbuf_t* buf, const u1_t* frame , int len, dbuf_t* lbu
 void s2e_make_beacon (uint8_t* layout, sL_t epoch_secs, int infodesc, double lat, double lon, uint8_t* buf);
 
 
-enum { SF12, SF11, SF10, SF9, SF8, SF7, FSK, SFNIL };
+enum { SF12, SF11, SF10, SF9, SF8, SF7, SF6, SF5, FSK, SFNIL };
 enum { BW125, BW250, BW500, BWNIL };
-enum { RPS_DNONLY = 0x20 };
-enum { RPS_BCN = 0x40 };
+enum { RPS_DNONLY = 0x40 };
+enum { RPS_BCN = 0x80 };
+enum { RPS_LRFHSS = 0xFE };   // LR-FHSS modulation - not supported by SX130x
 enum { RPS_ILLEGAL = 0xFF };
 enum { RPS_FSK = FSK };
 typedef u1_t rps_t;
-inline int   rps_sf   (rps_t params) { return params &  0x7; }
-inline int   rps_bw   (rps_t params) { return (params >> 3) & 0x3; }
-inline rps_t rps_make (int sf, int bw) { return (sf&7) | ((bw&3)<<3); }
+inline int   rps_sf   (rps_t params) { return params &  0xf; }
+inline int   rps_bw   (rps_t params) { return (params >> 4) & 0x3; }
+inline rps_t rps_make (int sf, int bw) { return (sf&0xf) | ((bw&3)<<4); }
 
 // Radio TX states
 enum {
@@ -92,14 +93,49 @@ Q (869.7 MHz - 870 MHz):     1%
 */
 
 enum { DC_BAND_K, DC_BAND_L, DC_BAND_M, DC_BAND_N, DC_BAND_P, DC_BAND_Q, DC_NUM_BANDS };
+// Simplified band categories for sliding window
+enum { DC_DECI, DC_CENTI, DC_MILLI, DC_NUM_SIMPLE_BANDS };
 enum { MAX_DNCHNLS = 48 };
 enum { MAX_UPCHNLS = MAX_130X * 10 };  // 10 channels per chip
 enum { DR_CNT = 16 };
 enum { DR_ILLEGAL = 16 };
 
+// Sliding window duty cycle configuration
+enum { DC_MAX_RECORDS = 16 };  // Max TX records per band/channel per txunit
+enum { DC_DEFAULT_WINDOW_SECS = 3600 };  // 1 hour default window
+enum { DC_MAX_POWER_LEVELS = 4 };  // Max power-based duty cycle tiers
+
+// Duty cycle modes
+enum {
+    DC_MODE_LEGACY = 0,   // Legacy time-off-air (backward compat)
+    DC_MODE_BAND = 1,     // Per frequency band (EU868)
+    DC_MODE_CHANNEL = 2,  // Single limit all channels (AS923, IN865)
+    DC_MODE_POWER = 3     // Power-based limits (Thailand)
+};
+
+// TX record for sliding window tracking
+typedef struct dc_tx_record {
+    ustime_t timestamp;    // When transmission occurred
+    u4_t     airtime_us;   // Duration in microseconds
+} dc_tx_record_t;
+
+// Sliding window history per band/channel
+typedef struct dc_history {
+    dc_tx_record_t records[DC_MAX_RECORDS];
+    u1_t head;             // Circular buffer head
+    u1_t count;            // Number of valid records
+} dc_history_t;
+
+// Power-based duty cycle tier
+typedef struct dc_power_tier {
+    s1_t max_eirp_dbm;     // Max EIRP for this tier
+    u2_t limit_permille;   // Duty cycle limit (permille = 1/1000)
+} dc_power_tier_t;
+
 typedef struct s2txunit {
-    ustime_t dc_eu868bands[DC_NUM_BANDS];
-    ustime_t dc_perChnl[MAX_DNCHNLS+1];
+    ustime_t dc_eu868bands[DC_NUM_BANDS];  // Legacy: next available time per band
+    ustime_t dc_perChnl[MAX_DNCHNLS+1];    // Legacy: next available time per channel
+    dc_history_t* dc_history;              // Sliding window: TX history per band (allocated on demand)
     txidx_t  head;
     tmr_t    timer;
 } s2txunit_t;
@@ -124,7 +160,10 @@ typedef struct s2ctx {
     int    (*canTx)      (struct s2ctx* s2ctx, txjob_t* txjob, int* ccaDisabled);  // region dependent
 
     u1_t     ccaEnabled;     // this region uses CCA
-    rps_t    dr_defs[DR_CNT];
+    rps_t    dr_defs[DR_CNT];    // symmetric DR definitions (legacy)
+    rps_t    dr_defs_up[DR_CNT]; // uplink DR definitions (RP2 1.0.5+)
+    rps_t    dr_defs_dn[DR_CNT]; // downlink DR definitions (RP2 1.0.5+)
+    u1_t     asymmetric_drs;     // 1 if using separate up/dn DR tables
     u2_t     dc_chnlRate;
     u4_t     dn_chnls[MAX_DNCHNLS+1];
     u4_t     min_freq;
@@ -150,9 +189,12 @@ typedef struct s2ctx {
 extern u1_t s2e_dcDisabled;    // ignore duty cycle limits - override for test/dev
 extern u1_t s2e_ccaDisabled;   // ignore busy channels - override for test/dev
 extern u1_t s2e_dwellDisabled; // ignore dwell time limits - override for test/dev
+extern u1_t s2e_pduOnly;       // send raw PDU instead of parsed LoRaWAN fields
 
 
 rps_t    s2e_dr2rps (s2ctx_t*, u1_t dr);
+rps_t    s2e_dr2rps_up (s2ctx_t*, u1_t dr);  // uplink DR lookup
+rps_t    s2e_dr2rps_dn (s2ctx_t*, u1_t dr);  // downlink DR lookup
 u1_t     s2e_rps2dr (s2ctx_t*, rps_t rps);
 ustime_t s2e_calcUpAirTime (rps_t rps, u1_t plen);
 ustime_t s2e_calcDnAirTime (rps_t rps, u1_t plen, u1_t lcrc, u2_t preamble);

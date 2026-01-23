@@ -536,7 +536,8 @@ static void slave_challoc_cb (void* ctx, challoc_t* ch, int flag) {
     }
 }
 
-int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs) {
+int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs, lbt_config_t* lbt_config) {
+    (void)lbt_config;  // TODO: Pass LBT config to slaves
     if( strncmp(hwspec, "sx1301/", 7) != 0 ) {
         LOG(MOD_RAL|ERROR, "Unsupported hwspec=%s", hwspec);
         return 0;

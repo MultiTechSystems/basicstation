@@ -51,8 +51,6 @@ extern timestamp_counter_t counter_us; // from loragw_sx1302.c
 #define FSK_FDEV      25  // [kHz]
 #define FSK_PRMBL_LEN 5
 
-struct sx130xconf sx130xconf;
-
 static const u2_t SF_MAP[] = {
     [SF12 ]= DR_LORA_SF12,
     [SF11 ]= DR_LORA_SF11,
@@ -185,24 +183,15 @@ static sL_t       last_xtime;
 static tmr_t      rxpollTmr;
 static tmr_t      syncTmr;
 
-#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
-static tmr_t      tempTmr;
-#endif
 
-// ATTR_FASTCODE
+
+// ATTR_FASTCODE 
 static void synctime (tmr_t* tmr) {
     timesync_t timesync;
     int quality = ral_getTimesync(pps_en, &last_xtime, &timesync);
     ustime_t delay = ts_updateTimesync(0, quality, &timesync);
     rt_setTimer(&syncTmr, rt_micros_ahead(delay));
 }
-
-#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
-static void updatetemp(tmr_t tmr) {
-    update_temp_comp_value(&sx130xconf.tx_temp_lut);
-    rt_setTimer(&tempTmr, rt_micros_ahead(TEMP_COMP_UPDATE));
-}
-#endif
 
 u1_t ral_altAntennas (u1_t txunit) {
     return 0;
@@ -238,40 +227,14 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
     pkt_tx.coderate   = CR_LORA_4_5;
     pkt_tx.no_crc     = !txjob->addcrc;
     pkt_tx.size       = txjob->len;
-
-    #if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
-    pkt_tx.dig_gain = -1;
-    #endif
-
     memcpy(pkt_tx.payload, &s2ctx->txq.txdata[txjob->off], pkt_tx.size);
-
-    #if !defined(CFG_sx1302)
-    if (sx130xconf.tx_temp_lut.temp_comp_enabled) {
-        int8_t rf_power;
-        int8_t dig_gain;
-        lookup_power_settings(&sx130xconf.tx_temp_lut, pkt_tx.rf_power, &rf_power, &dig_gain);
-        LOG(XDEBUG, "Temp Tx Comp temp=%dC rf=%f idx=%d dig=%d pa=%d mix=%d", sx130xconf.tx_temp_lut.temp_comp_value, pkt_tx.rf_power, rf_power, dig_gain, sx130xconf.tx_temp_lut.lut[rf_power].pa_gain, sx130xconf.tx_temp_lut.lut[rf_power].mix_gain);
-        #if !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
-        pkt_tx.dig_gain = dig_gain;
-        #endif
-        pkt_tx.rf_power = rf_power;
-    }
-    #endif
 
     // NOTE: nocca not possible to implement with current libloragw API
 #if defined(CFG_sx1302)
     int err = lgw_send(&pkt_tx);
-
-    if( err != LGW_HAL_SUCCESS ) {
-        if( err != LGW_LBT_NOT_ALLOWED ) {
-            LOG(MOD_RAL|ERROR, "lgw_send failed");
-            return RAL_TX_FAIL;
-        }
-        return RAL_TX_NOCA;
-    }
 #else
     int err = lgw_send(pkt_tx);
-
+#endif
     if( err != LGW_HAL_SUCCESS ) {
         if( err != LGW_LBT_ISSUE ) {
             LOG(MOD_RAL|ERROR, "lgw_send failed");
@@ -279,8 +242,6 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
         }
         return RAL_TX_NOCA;
     }
-#endif
-
     return RAL_TX_OK;
 }
 
@@ -312,7 +273,6 @@ void ral_txabort (u1_t txunit) {
 #endif
 }
 
-//ATTR_FASTCODE
 static void log_rawpkt(u1_t level, str_t msg, struct lgw_pkt_rx_s * pkt_rx) {
     LOG(MOD_RAL|level, "%s[CRC %s] %^.3F %.2f/%.1f %R (mod=%d/dr=%d/bw=%d) xtick=%08x (%u) %d bytes: %64H",
         msg,
@@ -321,8 +281,6 @@ static void log_rawpkt(u1_t level, str_t msg, struct lgw_pkt_rx_s * pkt_rx) {
         pkt_rx->snr,
 #if defined(CFG_sx1302)
         pkt_rx->rssis,
-        // Set fine timestamp on
-        rxjob->fts = pkt_rx.ftime_received ? (u4_t)pkt_rx.ftime : -1;
 #else
         pkt_rx->rssi,
 #endif
@@ -337,7 +295,7 @@ static void log_rawpkt(u1_t level, str_t msg, struct lgw_pkt_rx_s * pkt_rx) {
     );
 }
 
-//ATTR_FASTCODE
+//ATTR_FASTCODE 
 static void rxpolling (tmr_t* tmr) {
     int rounds = 0;
     while(rounds++ < RAL_MAX_RXBURST) {
@@ -375,9 +333,6 @@ static void rxpolling (tmr_t* tmr) {
         rxjob->xtime = ts_xticks2xtime(pkt_rx.count_us, last_xtime);
 #if defined(CFG_sx1302)
         rxjob->rssi  = (u1_t)-pkt_rx.rssis;
-        if (pkt_rx.ftime_received) {
-            rxjob->fts = pkt_rx.ftime;
-        }
 #else
         rxjob->rssi  = (u1_t)-pkt_rx.rssi;
 #endif
@@ -401,7 +356,7 @@ static void rxpolling (tmr_t* tmr) {
 }
 
 
-int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs) {
+int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs, lbt_config_t* lbt_config) {
     if( strcmp(hwspec, "sx1301/1") != 0 ) {
         LOG(MOD_RAL|ERROR, "Unsupported hwspec=%s", hwspec);
         return 0;
@@ -421,44 +376,21 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
     while( (slaveIdx = uj_nextSlot(&D)) >= 0 ) {
         dbuf_t json = uj_skipValue(&D);
         if( slaveIdx == 0 ) {
+            struct sx130xconf sx130xconf;
             int status = 0;
 
-            // Zero and setup some defaults
-            memset(&sx130xconf, 0, sizeof(struct sx130xconf));
-
-            // set default antenna gain to 3.0 dBi
-            LOG(MOD_RAL|INFO, "Set default antenna gain to 3.0 dBi");
-            sx130xconf.txpowAdjust = 3.0 * TXPOW_SCALE;
-
-#if !defined(CFG_sx1302)
-            if( (status = !sx130xconf_parse_tcomp(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 0) ||
-                (status = !sx130xconf_parse_setup(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 1) ||
-#else
-            if( (status = !sx130xconf_parse_setup(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 1) ||
-#endif
-                (status = !sx130xconf_challoc(&sx130xconf, upchs)    << 2) ||
-                (status = !sys_runRadioInit(sx130xconf.device)       << 3) ||
-                (status = !sx130xconf_start(&sx130xconf, cca_region) << 4) ) {
+            if( (status = !sx130xconf_parse_setup(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 0) ||
+                (status = !sx130xconf_challoc(&sx130xconf, upchs)    << 1) ||
+                (status = !sys_runRadioInit(sx130xconf.device)       << 2) ||
+                (status = !sx130xconf_start(&sx130xconf, cca_region, lbt_config) << 3) ) {
                 LOG(MOD_RAL|ERROR, "ral_config failed with status 0x%02x", status);
             } else {
-
                 // Radio started
                 txpowAdjust = sx130xconf.txpowAdjust;
                 pps_en = sx130xconf.pps;
-
                 last_xtime = ts_newXtimeSession(0);
                 rt_yieldTo(&rxpollTmr, rxpolling);
                 rt_yieldTo(&syncTmr, synctime);
-
-#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
-                if (sx130xconf.tx_temp_lut.temp_comp_enabled) {
-                    sx130xconf.tx_temp_lut.temp_comp_value = 20;
-                    strncpy(sx130xconf.tx_temp_lut.temp_comp_file, DEFAULT_TEMP_COMP_FILE, sizeof(sx130xconf.tx_temp_lut.temp_comp_file)-1);
-                    update_temp_comp_value(&sx130xconf.tx_temp_lut);
-                    rt_yieldTo(&tempTmr, updatetemp);
-                }
-#endif
-
                 ok = 1;
             }
         }
@@ -474,18 +406,12 @@ void ral_ini() {
     last_xtime = 0;
     rt_iniTimer(&rxpollTmr, rxpolling);
     rt_iniTimer(&syncTmr, synctime);
-#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
-    rt_iniTimer(&tempTmr, updatetemp);
-#endif
 }
 
 void ral_stop() {
     rt_clrTimer(&syncTmr);
     last_xtime = 0;
     rt_clrTimer(&rxpollTmr);
-#if !defined(CFG_sx1302) && !defined(CFG_variant_testsim) && !defined(CFG_variant_testms)
-    rt_clrTimer(&tempTmr);
-#endif
     lgw_stop();
 }
 

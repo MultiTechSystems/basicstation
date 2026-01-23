@@ -1,0 +1,6 @@
+*.uri
+*.pid
+*.done
+*.info
+spidev
+_filteredlog

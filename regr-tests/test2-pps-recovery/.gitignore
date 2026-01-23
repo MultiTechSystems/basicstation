@@ -1,0 +1,9 @@
+*.fifo
+*.log
+*.pid
+station.log*
+tc.cred
+tc.done
+spidev
+*.gcda
+*.info
