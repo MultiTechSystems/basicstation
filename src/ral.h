@@ -36,6 +36,9 @@
 #include "s2e.h"
 #include "timesync.h"
 
+// Forward declaration for LBT config (defined in sx130xconf.h)
+struct lbt_config;
+
 // Encoding of xtime:
 //  bits:
 //   63    sign (always positive)
@@ -108,7 +111,7 @@ int ral_rps2sf (rps_t rps);
 
 void  ral_ini ();
 void  ral_stop ();
-int   ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs);
+int   ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs, struct lbt_config* lbt_config);
 int   ral_txstatus (u1_t txunit);
 void  ral_txabort (u1_t txunit);
 int   ral_tx  (txjob_t* txjob, s2ctx_t* s2ctx, int nocca);

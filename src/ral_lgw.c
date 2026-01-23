@@ -356,7 +356,7 @@ static void rxpolling (tmr_t* tmr) {
 }
 
 
-int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs) {
+int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs, lbt_config_t* lbt_config) {
     if( strcmp(hwspec, "sx1301/1") != 0 ) {
         LOG(MOD_RAL|ERROR, "Unsupported hwspec=%s", hwspec);
         return 0;
@@ -382,7 +382,7 @@ int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t
             if( (status = !sx130xconf_parse_setup(&sx130xconf, -1, hwspec, json.buf, json.bufsize) << 0) ||
                 (status = !sx130xconf_challoc(&sx130xconf, upchs)    << 1) ||
                 (status = !sys_runRadioInit(sx130xconf.device)       << 2) ||
-                (status = !sx130xconf_start(&sx130xconf, cca_region) << 3) ) {
+                (status = !sx130xconf_start(&sx130xconf, cca_region, lbt_config) << 3) ) {
                 LOG(MOD_RAL|ERROR, "ral_config failed with status 0x%02x", status);
             } else {
                 // Radio started

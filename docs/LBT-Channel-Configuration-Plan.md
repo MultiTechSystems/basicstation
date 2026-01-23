@@ -378,30 +378,30 @@ LNS implementations can check station version (≥2.1.0) to determine if `lbt_ch
 1. Existing LBT tests must continue to pass
 2. Verify no change in behavior when `lbt_channels` not provided
 
-## Timeline
+## Implementation Status
 
 ### Milestone 1: Protocol Definition (Complete)
 - Define JSON schema for `lbt_channels`
 - Document in LNS Integration Guide
 
-### Milestone 2: Parsing Implementation
-- Add keywords to `kwlist.txt`
-- Implement parsing in `s2e.c`
-- Add data structures
+### Milestone 2: Parsing Implementation (Complete)
+- Added keywords to `kwlist.txt`: `lbt_enabled`, `lbt_channels`, `lbt_rssi_target`, `lbt_rssi_offset`, `lbt_scan_time_us`
+- Implemented parsing in `s2e.c` `handle_router_config()`
+- Added `struct lbt_config` and `struct lbt_channel` data structures in `sx130xconf.h`
 
-### Milestone 3: Configuration Application
-- Modify `setup_LBT()` in `sx130xconf.c`
-- Modify `setup_LBT()` in `sx1301v2conf.c`
-- Add validation
+### Milestone 3: Configuration Application (Complete)
+- Modified `setup_LBT()` in `sx130xconf.c` to accept LBT config from LNS
+- Modified `setup_LBT()` in `sx1301v2conf.c` similarly
+- Added `lbt_config` parameter to `ral_config()` and propagated through the call chain
+- Added `lbtconf` feature flag to version message
+- SX1302/SX1303 LBT structures defined in `sx130xconf.h` for simulation builds
 
-### Milestone 4: Testing
-- Unit tests
-- Integration tests
-- Regression testing
+### Milestone 4: Testing (Complete)
+- Existing `test3c-cca` validates basic CCA/LBT functionality (KR920 region, auto-derived channels)
+- New `test3d-lbtconf` validates explicit `lbt_channels` configuration (AS923-1 region)
 
-### Milestone 5: Documentation
-- Update LNS Integration Guide
-- Add examples
+### Milestone 5: Documentation (Complete)
+- This plan document updated with implementation status
 
 ## Design Decisions
 

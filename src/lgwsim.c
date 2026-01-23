@@ -51,6 +51,7 @@
 #include "rt.h"
 #include "s2e.h"
 #include "sys.h"
+#include "sx130xconf.h"
 
 #include "sys_linux.h"
 
@@ -598,6 +599,16 @@ int lgw_txgain_setconf (struct lgw_tx_gain_lut_s* conf) {
 int lgw_lbt_setconf (struct lgw_conf_lbt_s conf) {
     return LGW_HAL_SUCCESS;
 }
+
+#if defined(CFG_sx1302)
+int lgw_sx1261_setconf (struct lgw_conf_sx1261_s *conf) {
+    if (conf && conf->enable) {
+        LOG(MOD_RAL|INFO, "SX1261 LBT configured: rssi_target=%d nb_channel=%d",
+            conf->lbt_conf.rssi_target, conf->lbt_conf.nb_channel);
+    }
+    return LGW_HAL_SUCCESS;
+}
+#endif // CFG_sx1302
 
 str_t lgw_version_info () {
     return "LGW Simulation";

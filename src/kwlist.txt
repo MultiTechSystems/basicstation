@@ -5,6 +5,9 @@ api
 arguments
 AS923
 AS923-1
+AS923-2
+AS923-3
+AS923-4
 AS923JP
 asap
 AU915
@@ -121,6 +124,13 @@ version
 web_port
 web_dir
 xtime
+# ----------------------------------------
+# LBT configuration from router_config
+lbt_enabled
+lbt_channels
+lbt_rssi_target
+lbt_rssi_offset
+lbt_scan_time_us
 # ----------------------------------------
 # sx1301 conf
 bandwidth

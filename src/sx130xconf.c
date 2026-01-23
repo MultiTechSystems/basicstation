@@ -346,25 +346,46 @@ static int find_sx130x_conf (str_t filename, struct sx130xconf* sx130xconf) {
 }
 
 
-static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
-#if !defined(CFG_sx1302) // For now sx1302 does not support CCA
-    u2_t scantime_us = 0;
+static void dump_lbtConf (struct sx130xconf* sx130xconf);
 
-    if( cca_region == J_AS923_1 ) {
+static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region, lbt_config_t* lbt_config) {
+#if !defined(CFG_sx1302)
+    u2_t scantime_us = 0;
+    s1_t rssi_target = -80;
+
+    // Set region defaults
+    if( cca_region == J_AS923_1 || cca_region == J_AS923_2 || 
+        cca_region == J_AS923_3 || cca_region == J_AS923_4 ) {
         scantime_us = 5000;
-        sx130xconf->lbt.rssi_target = -80;
+        rssi_target = -80;
     }
     else if( cca_region == J_KR920 ) {
         scantime_us = 5000;
-        sx130xconf->lbt.rssi_target = -67;
+        rssi_target = -67;
     }
     else {
         LOG(MOD_RAL|ERROR, "Failed to setup CCA/LBT for region (crc=0x%08X)", cca_region);
         return 0;
     }
-    // By default use up link frequencies as LBT frequencies
-    // Otherwise we should have gotten a freq list from the server
-    if( sx130xconf->lbt.nb_channel == 0 ) {
+
+    // Apply LNS-provided RSSI target if specified
+    if( lbt_config && lbt_config->rssi_target != 0 )
+        rssi_target = lbt_config->rssi_target;
+    sx130xconf->lbt.rssi_target = rssi_target;
+
+    // Apply LNS-provided LBT channels if specified
+    if( lbt_config && lbt_config->nb_channel > 0 ) {
+        int max_channels = min(lbt_config->nb_channel, LBT_CHANNEL_FREQ_NB);
+        for( int i=0; i < max_channels; i++ ) {
+            sx130xconf->lbt.channels[i].freq_hz = lbt_config->channels[i].freq_hz;
+            sx130xconf->lbt.channels[i].scan_time_us = 
+                lbt_config->channels[i].scan_time_us ? lbt_config->channels[i].scan_time_us : scantime_us;
+        }
+        sx130xconf->lbt.nb_channel = max_channels;
+        LOG(MOD_RAL|INFO, "Using %d LBT channels from LNS configuration", max_channels);
+    }
+    // Otherwise derive from uplink channels (existing behavior)
+    else if( sx130xconf->lbt.nb_channel == 0 ) {
         for( int rfi=0; rfi < LGW_RF_CHAIN_NB; rfi++ ) {
             if( !sx130xconf->rfconf[rfi].enable )
                 continue;
@@ -376,17 +397,100 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region) {
                 if( sx130xconf->lbt.nb_channel < LBT_CHANNEL_FREQ_NB ) {
                     u4_t freq = cfreq + sx130xconf->ifconf[ifi].freq_hz;
                     sx130xconf->lbt.channels[sx130xconf->lbt.nb_channel].freq_hz = freq;
+                    sx130xconf->lbt.channels[sx130xconf->lbt.nb_channel].scan_time_us = scantime_us;
                     sx130xconf->lbt.nb_channel += 1;
                 }
             }
         }
     }
-    for( int i=0; i<sx130xconf->lbt.nb_channel; i++ )
-        sx130xconf->lbt.channels[i].scan_time_us = scantime_us;
     sx130xconf->lbt.enable = 1;
+
+    dump_lbtConf(sx130xconf);
+
     int e = lgw_lbt_setconf(sx130xconf->lbt);
     if( e != LGW_HAL_SUCCESS ) {
         LOG(MOD_RAL|ERROR, "lgw_lbt_setconf failed: %s", sx130xconf->device);
+        return 0;
+    }
+#else // SX1302/SX1303 LBT support using SX1261 radio
+    u2_t scantime_us = 0;
+    s1_t rssi_target = -80;
+    sx130xconf->sx1261_cfg.enable = true;
+
+    // Based on sx130x spidev choose sx1261 spidev
+    if (strcmp(sx130xconf->device, "/dev/spidev0.0") == 0) {
+        strcpy(sx130xconf->sx1261_cfg.spi_path, "/dev/spidev0.1");
+    } else if (strcmp(sx130xconf->device, "/dev/spidev1.0") == 0) {
+        strcpy(sx130xconf->sx1261_cfg.spi_path, "/dev/spidev1.1");
+    }
+
+    // Set region defaults
+    if( cca_region == J_AS923_1 || cca_region == J_AS923_2 || 
+        cca_region == J_AS923_3 || cca_region == J_AS923_4 ) {
+        scantime_us = 5000;
+        rssi_target = -80;
+    }
+    else if( cca_region == J_KR920 ) {
+        scantime_us = 5000;
+        rssi_target = -67;
+    }
+    else {
+        LOG(MOD_RAL|ERROR, "Failed to setup CCA/LBT for region (crc=0x%08X)", cca_region);
+        return 0;
+    }
+
+    // Apply LNS-provided RSSI target if specified
+    if( lbt_config && lbt_config->rssi_target != 0 )
+        rssi_target = lbt_config->rssi_target;
+    sx130xconf->sx1261_cfg.lbt_conf.rssi_target = rssi_target;
+
+    // Apply LNS-provided LBT channels if specified
+    if( lbt_config && lbt_config->nb_channel > 0 ) {
+        int max_channels = min(lbt_config->nb_channel, LGW_LBT_CHANNEL_NB_MAX);
+        for( int i=0; i < max_channels; i++ ) {
+            sx130xconf->sx1261_cfg.lbt_conf.channels[i].freq_hz = lbt_config->channels[i].freq_hz;
+            sx130xconf->sx1261_cfg.lbt_conf.channels[i].scan_time_us = 
+                lbt_config->channels[i].scan_time_us ? lbt_config->channels[i].scan_time_us : scantime_us;
+            sx130xconf->sx1261_cfg.lbt_conf.channels[i].bandwidth = 
+                lbt_config->channels[i].bandwidth ? lbt_config->channels[i].bandwidth : BW_125KHZ;
+            sx130xconf->sx1261_cfg.lbt_conf.channels[i].transmit_time_ms = 4000; // TX dwell time
+        }
+        sx130xconf->sx1261_cfg.lbt_conf.nb_channel = max_channels;
+        LOG(MOD_RAL|INFO, "Using %d LBT channels from LNS configuration", max_channels);
+    }
+    // Otherwise derive from uplink channels (existing behavior)
+    else if( sx130xconf->sx1261_cfg.lbt_conf.nb_channel == 0 ) {
+        u4_t cfreq = 0;
+        int n = max(8, LGW_IF_CHAIN_NB);
+
+        for( int ifi=0; ifi < n; ifi++ ) {
+            if( !sx130xconf->ifconf[ifi].enable )
+                continue;
+            if( sx130xconf->sx1261_cfg.lbt_conf.nb_channel < LGW_LBT_CHANNEL_NB_MAX ) {
+                cfreq = sx130xconf->rfconf[sx130xconf->ifconf[ifi].rf_chain].freq_hz;
+                if( !sx130xconf->rfconf[sx130xconf->ifconf[ifi].rf_chain].enable )
+                    continue;
+
+                u4_t freq = cfreq + sx130xconf->ifconf[ifi].freq_hz;
+                u1_t bw = sx130xconf->ifconf[ifi].bandwidth;
+
+                if (bw < BW_500KHZ) {
+                    sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].freq_hz = freq;
+                    sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].bandwidth = bw;
+                    sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].scan_time_us = scantime_us;
+                    sx130xconf->sx1261_cfg.lbt_conf.channels[sx130xconf->sx1261_cfg.lbt_conf.nb_channel].transmit_time_ms = 4000;
+                    sx130xconf->sx1261_cfg.lbt_conf.nb_channel += 1;
+                }
+            }
+        }
+    }
+    sx130xconf->sx1261_cfg.lbt_conf.enable = true;
+
+    dump_lbtConf(sx130xconf);
+
+    int e = lgw_sx1261_setconf(&sx130xconf->sx1261_cfg);
+    if( e != LGW_HAL_SUCCESS ) {
+        LOG(MOD_RAL|ERROR, "lgw_sx1261_setconf failed: %s", sx130xconf->device);
         return 0;
     }
 #endif // !defined(CFG_sx1302)
@@ -619,12 +723,25 @@ static void dump_lbtConf (struct sx130xconf* sx130xconf) {
     } else {
         LOG(MOD_RAL|INFO, "SX130x LBT not enabled");
     }
-    log_flushIO();
+#else
+    if( sx130xconf->sx1261_cfg.lbt_conf.enable ) {
+        LOG(MOD_RAL|INFO, "SX1302 LBT enabled via SX1261: rssi_target=%d rssi_offset=%d",
+            sx130xconf->sx1261_cfg.lbt_conf.rssi_target, sx130xconf->sx1261_cfg.rssi_offset);
+        for( int i=0; i < sx130xconf->sx1261_cfg.lbt_conf.nb_channel; i++ ) {
+            LOG(MOD_RAL|INFO, "  %2d: freq=%F scan=%dus bw=%d",
+                i, sx130xconf->sx1261_cfg.lbt_conf.channels[i].freq_hz, 
+                sx130xconf->sx1261_cfg.lbt_conf.channels[i].scan_time_us,
+                sx130xconf->sx1261_cfg.lbt_conf.channels[i].bandwidth);
+        }
+    } else {
+        LOG(MOD_RAL|INFO, "SX1302 LBT not enabled");
+    }
 #endif
+    log_flushIO();
 }
 
 
-int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
+int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region, lbt_config_t* lbt_config) {
     str_t errmsg = "";
     lgw_stop();
     LOG(MOD_RAL|INFO,"Lora gateway library version: %s", lgw_version_info());
@@ -691,7 +808,7 @@ int sx130xconf_start (struct sx130xconf* sx130xconf, u4_t cca_region) {
     }
 
     dump_lbtConf(sx130xconf);
-    if( cca_region && !setup_LBT(sx130xconf, cca_region) ) {
+    if( cca_region && !setup_LBT(sx130xconf, cca_region, lbt_config) ) {
         errmsg = "setup_LBT";
         goto fail;
     }
