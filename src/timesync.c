@@ -32,6 +32,15 @@
 #include "tc.h"
 #include "timesync.h"
 #include "ral.h"
+#if defined(CFG_sx1302)
+#if defined(CFG_lgwsim)
+// Mock declaration for simulation builds
+int sx1302_gps_enable(int enable);
+#else
+#include "lgw/loragw_hal.h"
+#include "lgw/loragw_sx1302.h"
+#endif
+#endif
 
 #if defined(CFG_smtcpico)
 #define _MAX_DT 300
