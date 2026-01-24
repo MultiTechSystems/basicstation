@@ -1227,7 +1227,8 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
     // Reset feature flags to defaults - they must be explicitly set in each router_config
     s2e_pduOnly = 0;
     s2e_pduEncoding = PDU_ENC_HEX;
-    s2e_dcDisabled = 0;
+    // Note: s2e_dcDisabled is NOT reset here - station.conf setting should persist
+    // The router_config can override via nodc/duty_cycle_enabled fields (handled below)
 
     // Reset duty cycle configuration to defaults
     dc_mode = DC_MODE_LEGACY;
