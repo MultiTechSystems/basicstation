@@ -1,0 +1,4 @@
+git-repo/
+build/
+platform-*/
+*.tar.gz
