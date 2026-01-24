@@ -305,10 +305,9 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
     }
     // We update ppsSync only if we have two consecutive time syncs with valid PPS timestamps
     // and if they are apart ~1s - we might see weird values if no PPS pulse occurred during time sync span.
-    // Also skip PPS processing if GPS has been disabled by LNS (e.g., due to hardware issues)
-    if( !sys_gpsEnabled() ) {
-        goto done;  // GPS disabled by LNS - skip PPS processing
-    }
+    // Note: GPS control via LNS (gps_enable field) stops/starts the GPS device connection,
+    // but PPS processing continues based on PPS availability from the radio HAL.
+    // When GPS is disabled, PPS timestamps will stop being updated, causing this check to skip.
     if( !last->pps_xtime || !curr->pps_xtime ) {
         goto done;
     }

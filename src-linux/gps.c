@@ -828,6 +828,7 @@ int sys_gpsEnabled () {
 // This OVERRIDES the station.conf setting
 // Returns 1 if state changed, 0 if no change
 int sys_setGPSEnabled (int enabled) {
+    extern u1_t gpsEnabled;  // from station.conf
     int new_state = enabled ? 1 : 0;
     int old_effective = sys_gpsEnabled();
     
@@ -844,17 +845,21 @@ int sys_setGPSEnabled (int enabled) {
     if( !new_state ) {
         // LNS is disabling GPS - override station.conf
         LOG(MOD_GPS|INFO, "GPS disabled by LNS (overrides station.conf)");
+        // Track if GPS was configured so we can restart when re-enabled
+        if( gpsEnabled )
+            gps_was_running = 1;
         sys_disableGPS();
     } else {
         // LNS is re-enabling GPS
-        if( gps_was_running ) {
+        // Restart GPS if it was running or if station.conf had it enabled
+        if( gps_was_running || gpsEnabled ) {
             LOG(MOD_GPS|INFO, "GPS re-enabled by LNS");
             gps_was_running = 0;
             if( !gps_reopen() ) {
                 LOG(MOD_GPS|ERROR, "Failed to re-open GPS");
             }
         } else {
-            LOG(MOD_GPS|INFO, "GPS enabled by LNS (was not running)");
+            LOG(MOD_GPS|INFO, "GPS enabled by LNS (not configured in station.conf)");
         }
     }
     return 1;
