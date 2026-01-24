@@ -481,22 +481,12 @@ static void gps_read(aio_t* _aio) {
     tv.tv_nsec = 100000000;
     FD_ZERO(&fds);
     FD_SET(gpsdata.gps_fd, &fds);
-    time_t exit_timer = 0;
 #endif
 
     while(1) {
 
-
 #if defined(CFG_usegpsd)
         n = pselect(gpsdata.gps_fd+1, &fds, NULL, NULL, &tv, NULL);
-        if (n >= 0 && exit_timer && time(NULL) >= exit_timer) {
-            LOG(MOD_GPS|XDEBUG, "gpsd pselect timeout expired");
-             // EOF
-            aio_close(aio);
-            aio = NULL;
-            reopen_timeout(NULL);
-            return;
-        }
 #else
         n = read(aio->fd, gpsline+gpsfill, sizeof(gpsline)-gpsfill);
         if( n == 0 ) {
@@ -623,9 +613,6 @@ static void gps_close() {
 
 
 static int gps_reopen () {
-    struct stat st;
-    int fd;
-
     if( aio ) {
         aio_close(aio);
         aio = NULL;
@@ -634,6 +621,8 @@ static int gps_reopen () {
 #if defined(CFG_usegpsd)
     if (true) {
 #else
+    struct stat st;
+    int fd;
     if( stat(device, &st) != -1  && (st.st_mode & S_IFMT) == S_IFIFO ) {
         if( (fd = open(device, O_RDONLY | O_NONBLOCK)) == -1 ) {
             LOG(MOD_GPS|ERROR, "Failed to open FIFO '%s': %s", device, strerror(errno));
