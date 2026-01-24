@@ -536,6 +536,12 @@ static void sx130xconf_challoc_cb (void* ctx, challoc_t* ch, int flag) {
 
     switch( flag ) {
     case CHALLOC_START: {
+        // Reset RF config before channel allocation
+        // This ensures disabled radios don't retain stale frequencies from previous configs
+        for( int i = 0; i < LGW_RF_CHAIN_NB; i++ ) {
+            sx130xconf->rfconf[i].freq_hz = 0;
+            sx130xconf->rfconf[i].enable = false;
+        }
         break;
     }
     case CHALLOC_CHIP_START: {
