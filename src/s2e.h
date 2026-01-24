@@ -208,6 +208,9 @@ void     s2e_addRxjob     (s2ctx_t*, rxjob_t* rxjob);
 void     s2e_flushRxjobs  (s2ctx_t*);
 int      s2e_onMsg        (s2ctx_t*, char* json, ujoff_t jsonlen);
 int      s2e_onBinary     (s2ctx_t*, u1_t* data, ujoff_t datalen);
+#if defined(CFG_protobuf)
+int      s2e_handleProtobufMsg (s2ctx_t*, u1_t* data, ujoff_t datalen);
+#endif
 ustime_t s2e_nextTxAction (s2ctx_t*, u1_t txunit);
 int      s2e_handleCommands (ujcrc_t msgtype, s2ctx_t* s2ctx, ujdec_t* D);
 void     s2e_handleRmtsh    (s2ctx_t* s2ctx, ujdec_t* D);

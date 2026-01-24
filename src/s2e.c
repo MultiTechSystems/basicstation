@@ -34,6 +34,7 @@
 #include "kwcrc.h"
 #include "timesync.h"
 #include "sx130xconf.h"
+#include "tcpb.h"
 
 
 u1_t s2e_dcDisabled;    // no duty cycle limits - override for test/dev
@@ -380,6 +381,65 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
             xprintf(&lbuf, "RX %F DR%d %R snr=%.1f rssi=%d xtime=0x%lX fts=%d - ",
                     j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime, j->fts);
 
+#if defined(CFG_protobuf)
+        if( tcpb_enabled() ) {
+            // Protobuf binary encoding path
+            int pblen;
+            
+            // Calculate reftime
+            double reftime = 0.0;
+            if( s2ctx->muxtime ) {
+                reftime = s2ctx->muxtime +
+                    ts_normalizeTimespanMCU(rt_getTime()-s2ctx->reftime) / 1e6;
+            }
+            
+            if( s2e_pduOnly ) {
+                // PDU-only mode: send raw PHYPayload without parsing
+                xprintf(&lbuf, "pdu-only %d bytes (protobuf)", j->len);
+                if( lbuf.buf )
+                    log_specialFlush(lbuf.pos);
+                
+                pblen = tcpb_encUpdfPduOnly(
+                    (u1_t*)sendbuf.buf, sendbuf.bufsize,
+                    &s2ctx->rxq.rxdata[j->off], j->len,
+                    j->dr, j->freq,
+                    j->rctx, j->xtime, ts_xtime2gpstime(j->xtime),
+                    -(s2_t)j->rssi, j->snr/4.0, j->fts,
+                    rt_getUTC()/1e6, reftime);
+            } else {
+                // Normal mode: parse frame and apply filters
+                uj_encOpen(&sendbuf, '{');
+                if( !s2e_parse_lora_frame(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len, lbuf.buf ? &lbuf : NULL) ) {
+                    // Frame failed sanity checks or stopped by filters
+                    sendbuf.pos = 0;
+                    continue;
+                }
+                if( lbuf.buf )
+                    log_specialFlush(lbuf.pos);
+                
+                // Encode to protobuf using the raw frame (parses internally)
+                pblen = tcpb_encRawFrame(
+                    (u1_t*)sendbuf.buf, sendbuf.bufsize,
+                    &s2ctx->rxq.rxdata[j->off], j->len,
+                    j->dr, j->freq,
+                    j->rctx, j->xtime, ts_xtime2gpstime(j->xtime),
+                    -(s2_t)j->rssi, j->snr/4.0, j->fts,
+                    rt_getUTC()/1e6, reftime);
+            }
+            
+            if( pblen < 0 ) {
+                LOG(MOD_S2E|ERROR, "Protobuf encoding failed for rxjob");
+                sendbuf.pos = 0;
+                continue;
+            }
+            
+            sendbuf.pos = pblen;
+            (*s2ctx->sendBinary)(s2ctx, &sendbuf);
+            assert(sendbuf.buf==NULL);
+            continue;
+        }
+#endif // CFG_protobuf
+
         uj_encOpen(&sendbuf, '{');
         if( s2e_pduOnly ) {
             // PDU-only mode: send raw frame without parsing into LoRaWAN fields
@@ -510,21 +570,38 @@ static void send_dntxed (s2ctx_t* s2ctx, txjob_t* txjob) {
             LOG(MOD_S2E|ERROR, "%J - failed to send dntxed, no buffer space", txjob);
             return;
         }
-        uj_encOpen(&sendbuf, '{');
-        uj_encKVn(&sendbuf,
-                  "msgtype",   's', "dntxed",
-                  "seqno",     'I', txjob->diid,    // for older servers (remove if obsoleted)
-                  "diid",      'I', txjob->diid,    // newer servers
-                  "DR",        'i', txjob->dr,
-                  "Freq",      'u', txjob->freq,
-                  rt_deveui,   'E', txjob->deveui,
-                  "rctx",      'i', txjob->txunit,  // antenna that sent this frame
-                  "xtime",     'I', txjob->xtime,
-                  "txtime",    'T', txjob->txtime/1e6,
-                  "gpstime",   'I', txjob->gpstime,
-                  NULL);
-        uj_encClose(&sendbuf, '}');
-        (*s2ctx->sendText)(s2ctx, &sendbuf);
+#if defined(CFG_protobuf)
+        if( tcpb_enabled() ) {
+            int pblen = tcpb_encDntxed(
+                (u1_t*)sendbuf.buf, sendbuf.bufsize,
+                txjob->diid, txjob->deveui,
+                txjob->txunit, txjob->xtime,
+                txjob->txtime/1e6, txjob->gpstime);
+            if( pblen > 0 ) {
+                sendbuf.pos = pblen;
+                (*s2ctx->sendBinary)(s2ctx, &sendbuf);
+            } else {
+                LOG(MOD_S2E|ERROR, "%J - failed to encode dntxed to protobuf", txjob);
+            }
+        } else
+#endif
+        {
+            uj_encOpen(&sendbuf, '{');
+            uj_encKVn(&sendbuf,
+                      "msgtype",   's', "dntxed",
+                      "seqno",     'I', txjob->diid,    // for older servers (remove if obsoleted)
+                      "diid",      'I', txjob->diid,    // newer servers
+                      "DR",        'i', txjob->dr,
+                      "Freq",      'u', txjob->freq,
+                      rt_deveui,   'E', txjob->deveui,
+                      "rctx",      'i', txjob->txunit,  // antenna that sent this frame
+                      "xtime",     'I', txjob->xtime,
+                      "txtime",    'T', txjob->txtime/1e6,
+                      "gpstime",   'I', txjob->gpstime,
+                      NULL);
+            uj_encClose(&sendbuf, '}');
+            (*s2ctx->sendText)(s2ctx, &sendbuf);
+        }
     }
     LOG(MOD_S2E|INFO, "TX %J - %s: %F %.1fdBm ant#%d(%d) DR%d %R frame=%12.4H (%u bytes)",
         txjob, txjob->deveui ? "dntxed" : "on air",
@@ -1635,6 +1712,14 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             uj_skipValue(D);
             break;
         }
+#if defined(CFG_protobuf)
+        case J_protocol_format: {
+            // Protocol format: "json" (default) or "protobuf"
+            str_t s = uj_str(D);
+            tcpb_setFormat(s);
+            break;
+        }
+#endif
         case J_bcning: {
             if( uj_null(D) )
                 break;
@@ -2443,12 +2528,207 @@ int s2e_onMsg (s2ctx_t* s2ctx, char* json, ujoff_t jsonlen) {
 }
 
 
+#if defined(CFG_protobuf)
+// Handle incoming protobuf messages from server
+int s2e_handleProtobufMsg (s2ctx_t* s2ctx, u1_t* data, ujoff_t datalen) {
+    // Union to hold decoded message
+    union {
+        tcpb_dnmsg_t dnmsg;
+        tcpb_timesync_resp_t timesync;
+        tcpb_runcmd_t runcmd;
+        tcpb_rmtsh_t rmtsh;
+    } decoded;
+    
+    tcpb_msgtype_t msgtype = tcpb_decode(data, datalen, &decoded);
+    
+    if( msgtype == TCPB_MSG_ERROR || msgtype == TCPB_MSG_UNKNOWN ) {
+        LOG(MOD_S2E|ERROR, "Failed to decode protobuf message (%d bytes)", datalen);
+        return 1;  // Don't close connection on decode error
+    }
+    
+    switch( msgtype ) {
+    case TCPB_MSG_DNMSG: {
+        tcpb_dnmsg_t* dnmsg = &decoded.dnmsg;
+        ustime_t now = rt_getTime();
+        
+        // Reserve a TX job slot
+        txjob_t* txjob = txq_reserveJob(&s2ctx->txq);
+        if( txjob == NULL ) {
+            LOG(MOD_S2E|ERROR, "Out of TX jobs - dropping protobuf dnmsg");
+            tcpb_freeDnmsg(dnmsg);
+            break;
+        }
+        
+        // Fill in txjob from protobuf message
+        txjob->deveui = dnmsg->deveui;
+        txjob->diid = dnmsg->diid;
+        txjob->xtime = dnmsg->xtime;
+        txjob->rctx = dnmsg->rctx;
+        txjob->gpstime = dnmsg->gpstime;
+        txjob->prio = dnmsg->priority;
+        
+        // Device class
+        switch( dnmsg->dclass ) {
+            case 0: txjob->txflags = TXFLAG_CLSA; break;
+            case 1: txjob->txflags = TXFLAG_PING; break;
+            case 2: txjob->txflags = TXFLAG_CLSC; break;
+        }
+        
+        // RX parameters
+        txjob->rxdelay = dnmsg->rxdelay > 0 ? dnmsg->rxdelay : 1;
+        txjob->dr = dnmsg->rx1dr;
+        txjob->freq = dnmsg->rx1freq;
+        txjob->rx2dr = dnmsg->rx2dr;
+        txjob->rx2freq = dnmsg->rx2freq;
+        
+        // Direct parameters (for Class B/C)
+        if( dnmsg->dr > 0 ) {
+            txjob->dr = dnmsg->dr;
+            txjob->rxdelay = 0;  // Direct TX, no RX delay
+        }
+        if( dnmsg->freq > 0 ) {
+            txjob->freq = dnmsg->freq;
+        }
+        
+        // Update muxtime if provided
+        if( dnmsg->muxtime > 0 ) {
+            s2e_updateMuxtime(s2ctx, dnmsg->muxtime, now);
+        }
+        
+        // Reserve space and copy PDU
+        if( dnmsg->pdu && dnmsg->pdulen > 0 ) {
+            if( dnmsg->pdulen > 255 ) {
+                LOG(MOD_S2E|ERROR, "Protobuf dnmsg PDU too large: %d > 255", dnmsg->pdulen);
+                txq_freeJob(&s2ctx->txq, txjob);
+                tcpb_freeDnmsg(dnmsg);
+                break;
+            }
+            u1_t* p = txq_reserveData(&s2ctx->txq, dnmsg->pdulen);
+            if( p == NULL ) {
+                LOG(MOD_S2E|ERROR, "Out of TX data space - dropping protobuf dnmsg");
+                txq_freeJob(&s2ctx->txq, txjob);
+                tcpb_freeDnmsg(dnmsg);
+                break;
+            }
+            memcpy(p, dnmsg->pdu, dnmsg->pdulen);
+            txjob->len = dnmsg->pdulen;
+        }
+        
+        // Set rctx from xtime if not provided
+        if( dnmsg->rctx == 0 && txjob->xtime ) {
+            txjob->rctx = ral_xtime2rctx(txjob->xtime);
+        }
+        txjob->txunit = ral_rctx2txunit(txjob->rctx);
+        
+        // Calculate TX time based on device class
+        if( (txjob->txflags & TXFLAG_PING) ) {
+            // Class B ping slot
+            txjob->xtime = ts_gpstime2xtime(txjob->txunit, txjob->gpstime);
+            txjob->txtime = ts_xtime2ustime(txjob->xtime);
+        } else {
+            // Class A or C
+            if( txjob->xtime != 0 ) {
+                txjob->xtime += txjob->rxdelay * 1000000;
+                txjob->txtime = ts_xtime2ustime(txjob->xtime);
+            }
+            if( txjob->freq == 0 ) {
+                // No RX1 - try RX2
+                if( txjob->rx2freq == 0 ) {
+                    LOG(MOD_S2E|WARNING, "Protobuf dnmsg has no RX1/RX2 frequencies");
+                    txq_freeJob(&s2ctx->txq, txjob);
+                    tcpb_freeDnmsg(dnmsg);
+                    break;
+                }
+                if( !altTxTime(s2ctx, txjob, now + TX_AIM_GAP) ) {
+                    LOG(MOD_S2E|WARNING, "Protobuf dnmsg has no viable RX2");
+                    txq_freeJob(&s2ctx->txq, txjob);
+                    tcpb_freeDnmsg(dnmsg);
+                    break;
+                }
+            }
+        }
+        
+        if( txjob->xtime == 0 || txjob->txtime == 0 ) {
+            LOG(MOD_S2E|ERROR, "%J - dropped due to time conversion problems - xtime=%ld", 
+                txjob, txjob->xtime);
+            txq_freeJob(&s2ctx->txq, txjob);
+            tcpb_freeDnmsg(dnmsg);
+            break;
+        }
+        
+        // Commit and schedule the TX job
+        txq_commitJob(&s2ctx->txq, txjob);
+        if( !s2e_addTxjob(s2ctx, txjob, /*initial placement*/0, now) ) {
+            txq_freeJob(&s2ctx->txq, txjob);
+        } else {
+            LOG(MOD_S2E|DEBUG, "Protobuf dnmsg scheduled: diid=%ld DevEui=%016lX dr=%d freq=%d",
+                dnmsg->diid, dnmsg->deveui, txjob->dr, txjob->freq);
+        }
+        
+        tcpb_freeDnmsg(dnmsg);
+        break;
+    }
+    case TCPB_MSG_TIMESYNC_RESP: {
+        ustime_t rxtime = rt_getTime();
+        tcpb_timesync_resp_t* ts = &decoded.timesync;
+        LOG(MOD_S2E|DEBUG, "Protobuf timesync response: txtime=%.0f gpstime=%ld xtime=%ld",
+            ts->txtime, ts->gpstime, ts->xtime);
+        
+        // Process timesync response - two modes:
+        // 1. Direct xtime->gpstime mapping (when LNS provides xtime)
+        if( ts->xtime != 0 ) {
+            ts_setTimesyncLns(ts->xtime, ts->gpstime);
+        }
+        // 2. Round-trip calculation (when LNS echoes back txtime with gpstime)
+        if( ts->txtime > 0 && ts->gpstime != 0 ) {
+            ts_processTimesyncLns((ustime_t)ts->txtime, rxtime, ts->gpstime);
+        }
+        // No free needed - timesync struct has no heap allocations
+        break;
+    }
+    case TCPB_MSG_RUNCMD: {
+        tcpb_runcmd_t* cmd = &decoded.runcmd;
+        LOG(MOD_S2E|DEBUG, "Protobuf runcmd: argc=%d", cmd->argc);
+        
+        if( cmd->argc > 0 && cmd->argv && cmd->argv[0] ) {
+            LOG(MOD_S2E|INFO, "Running command: %s", cmd->argv[0]);
+            // Command execution would need to join argv into a command string
+            // or use execv-style execution
+        }
+        tcpb_freeRuncmd(cmd);
+        break;
+    }
+    case TCPB_MSG_RMTSH: {
+        tcpb_rmtsh_t* rmtsh = &decoded.rmtsh;
+        LOG(MOD_S2E|DEBUG, "Protobuf rmtsh: start=%d stop=%d datalen=%d",
+            rmtsh->start, rmtsh->stop, rmtsh->datalen);
+        // Remote shell data - would need to be dispatched to rmtsh subsystem
+        // For now just log and free
+        tcpb_freeRmtsh(rmtsh);
+        break;
+    }
+    default:
+        LOG(MOD_S2E|WARNING, "Unhandled protobuf message type: %d", msgtype);
+        break;
+    }
+    
+    return 1;  // Success
+}
+#endif // CFG_protobuf
+
+
 #if defined(CFG_no_rmtsh)
 void s2e_handleRmtsh (s2ctx_t* s2ctx, ujdec_t* D) {
     uj_error(D, "Rmtsh not implemented");
 }
 
 int s2e_onBinary (s2ctx_t* s2ctx, u1_t* data, ujoff_t datalen) {
+#if defined(CFG_protobuf)
+    // If protobuf enabled, try to handle as protobuf message
+    if( tcpb_enabled() && datalen > 0 && data[0] == 0x08 ) {
+        return s2e_handleProtobufMsg(s2ctx, data, datalen);
+    }
+#endif
     LOG(MOD_S2E|ERROR, "Ignoring rmtsh binary data (%d bytes)", datalen);
     return 0;
 }

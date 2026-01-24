@@ -49,6 +49,13 @@ extern void selftest_ujdec ();
 extern void selftest_ujenc ();
 extern void selftest_xprintf ();
 extern void selftest_fs ();
+#if defined(CFG_protobuf)
+extern int selftest_tcpb ();
+#endif
+
+// Macro for tests that return error count
+#define TSTART() int _terrs = 0
+#define TDONE() return _terrs
 
 void selftest_fail (const char* expr, const char* file, int line);
 void selftests ();

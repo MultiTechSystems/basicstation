@@ -48,6 +48,14 @@ static void (*const selftest_fns[])() = {
     NULL
 };
 
+#if defined(CFG_protobuf)
+// Protobuf tests use different signature (return int)
+static int (*const selftest_pb_fns[])() = {
+    selftest_tcpb,
+    NULL
+};
+#endif
+
 
 // LCOV_EXCL_START
 void selftest_fail (const char* expr, const char* file, int line) {
@@ -59,18 +67,31 @@ void selftest_fail (const char* expr, const char* file, int line) {
 
 void selftests () {
     int i=-1;
+    int total = 0;
     while( selftest_fns[++i] ) {
         if( setjmp(onfail) ) {
             fails += 1;                  // LCOV_EXCL_LINE
         } else {
             selftest_fns[i]();
         }
+        total++;
     }
+#if defined(CFG_protobuf)
+    // Run protobuf tests (different signature)
+    i = -1;
+    while( selftest_pb_fns[++i] ) {
+        int errs = selftest_pb_fns[i]();
+        if( errs > 0 ) {
+            fails += errs;
+        }
+        total++;
+    }
+#endif
     if( fails == 0 ) {
-        fprintf(stderr,"ALL %d SELFTESTS PASSED\n", i);
+        fprintf(stderr,"ALL %d SELFTESTS PASSED\n", total);
         exit(0);
     }
-    fprintf(stderr,"TESTS FAILED: %d of %d\n", fails, i); // LCOV_EXCL_LINE
+    fprintf(stderr,"TESTS FAILED: %d of %d\n", fails, total); // LCOV_EXCL_LINE
     exit(70);                                             // LCOV_EXCL_LINE
 }
 

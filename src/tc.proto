@@ -1,0 +1,303 @@
+// TC Protocol - Protocol Buffers Schema
+// Copyright (c) Semtech Corporation
+// 
+// This schema defines the binary message format for the TC (Traffic Controller)
+// protocol between LoRa Basics Station and the LNS (LoRaWAN Network Server).
+//
+// Usage: protoc-c --c_out=. tc.proto
+//        generates: tc.pb-c.h and tc.pb-c.c
+
+syntax = "proto3";
+package basicstation;
+
+// Message type enumeration (replaces "msgtype" string field)
+enum MsgType {
+  MSG_UNKNOWN = 0;
+  
+  // Station -> LNS (uplink direction)
+  MSG_UPDF = 1;        // Uplink data frame
+  MSG_JREQ = 2;        // Join request
+  MSG_PROPDF = 3;      // Proprietary frame
+  MSG_DNTXED = 4;      // TX confirmation
+  MSG_TIMESYNC = 5;    // Time sync request
+  
+  // LNS -> Station (downlink direction)
+  MSG_DNMSG = 10;      // Downlink message
+  MSG_DNSCHED = 11;    // Multicast schedule
+  MSG_TIMESYNC_RESP = 12;  // Time sync response
+  MSG_RUNCMD = 13;     // Run command
+  MSG_RMTSH = 14;      // Remote shell
+}
+
+// Device class enumeration
+enum DeviceClass {
+  CLASS_A = 0;
+  CLASS_B = 1;
+  CLASS_C = 2;
+}
+
+// Common radio metadata for uplink messages
+// Contains all information about how the packet was received
+message RadioMetadata {
+  // Data rate index (0-15, region-specific)
+  uint32 dr = 1;
+  
+  // Frequency in Hz
+  uint32 freq = 2;
+  
+  // Radio context - opaque value passed back in downlink
+  int64 rctx = 3;
+  
+  // Internal timestamp (concentrator counter, microseconds)
+  int64 xtime = 4;
+  
+  // GPS time in microseconds since GPS epoch (if available)
+  // Set to 0 if GPS not available
+  int64 gpstime = 5;
+  
+  // RSSI in dBm (typically negative, e.g., -50)
+  int32 rssi = 6;
+  
+  // SNR in dB (can be negative for weak signals)
+  float snr = 7;
+  
+  // Fine timestamp for geolocation (-1 if not available)
+  int32 fts = 8;
+  
+  // UTC receive time as Unix timestamp with fractional seconds
+  double rxtime = 9;
+}
+
+// Uplink data frame (msgtype: "updf")
+// Sent from Station to LNS for confirmed/unconfirmed data frames
+message UplinkDataFrame {
+  // MAC header byte
+  uint32 mhdr = 1;
+  
+  // Device address (4 bytes)
+  fixed32 dev_addr = 2;
+  
+  // Frame control byte
+  uint32 fctrl = 3;
+  
+  // Frame counter (16-bit in LoRaWAN 1.0.x, extended by LNS)
+  uint32 fcnt = 4;
+  
+  // Frame options (MAC commands in header, raw bytes)
+  bytes fopts = 5;
+  
+  // Frame port (-1 if no port present, 0 for MAC commands)
+  int32 fport = 6;
+  
+  // Frame payload (encrypted application data, raw bytes)
+  bytes frm_payload = 7;
+  
+  // Message Integrity Code (4 bytes)
+  fixed32 mic = 8;
+  
+  // Radio metadata
+  RadioMetadata upinfo = 9;
+  
+  // Reference time for RX window calculation
+  double ref_time = 10;
+  
+  // Raw PDU (PHYPayload) - used in pdu-only mode
+  // When present, the parsed fields (mhdr, dev_addr, etc.) may be omitted
+  bytes pdu = 11;
+}
+
+// Join request (msgtype: "jreq")
+// Sent from Station to LNS for OTAA join requests
+message JoinRequest {
+  // MAC header byte (always 0x00 for join request)
+  uint32 mhdr = 1;
+  
+  // Join EUI (AppEUI in LoRaWAN 1.0.x) - 8 bytes as fixed64
+  fixed64 join_eui = 2;
+  
+  // Device EUI - 8 bytes as fixed64
+  fixed64 dev_eui = 3;
+  
+  // Device nonce (2 bytes in 1.0.x, extended in 1.1)
+  uint32 dev_nonce = 4;
+  
+  // Message Integrity Code (4 bytes)
+  fixed32 mic = 5;
+  
+  // Radio metadata
+  RadioMetadata upinfo = 6;
+  
+  // Reference time for RX window calculation
+  double ref_time = 7;
+}
+
+// Proprietary frame (msgtype: "propdf")
+// Sent from Station to LNS for proprietary/vendor-specific frames
+message ProprietaryFrame {
+  // Entire PHYPayload as raw bytes
+  bytes frm_payload = 1;
+  
+  // Radio metadata
+  RadioMetadata upinfo = 2;
+  
+  // Reference time
+  double ref_time = 3;
+}
+
+// TX confirmation (msgtype: "dntxed")
+// Sent from Station to LNS after successful downlink transmission
+message TxConfirmation {
+  // Downlink ID (from dnmsg)
+  int64 diid = 1;
+  
+  // Device EUI
+  fixed64 dev_eui = 2;
+  
+  // Radio context used for TX
+  int64 rctx = 3;
+  
+  // Actual transmit timestamp
+  int64 xtime = 4;
+  
+  // UTC transmit time
+  double txtime = 5;
+  
+  // GPS time of transmission
+  int64 gpstime = 6;
+}
+
+// Time sync message (msgtype: "timesync")
+// Bidirectional - Station sends request, LNS responds
+message TimeSync {
+  // Station -> LNS: transmission time of this message
+  double txtime = 1;
+  
+  // LNS -> Station: GPS time reference
+  int64 gpstime = 2;
+  
+  // LNS -> Station: corresponding xtime for GPS transfer
+  int64 xtime = 3;
+}
+
+// Downlink message (msgtype: "dnmsg")
+// Sent from LNS to Station for unicast downlinks
+message DownlinkMessage {
+  // Device EUI
+  fixed64 dev_eui = 1;
+  
+  // Device class
+  DeviceClass dc = 2;
+  
+  // Downlink ID (for correlation with dntxed)
+  int64 diid = 3;
+  
+  // PHYPayload to transmit (raw bytes, not hex)
+  bytes pdu = 4;
+  
+  // RX delay (seconds, typically 1)
+  uint32 rx_delay = 5;
+  
+  // RX1 parameters
+  uint32 rx1_dr = 6;
+  uint32 rx1_freq = 7;
+  
+  // RX2 parameters
+  uint32 rx2_dr = 8;
+  uint32 rx2_freq = 9;
+  
+  // Priority (0 = lowest)
+  uint32 priority = 10;
+  
+  // Timing reference for Class A (from uplink)
+  int64 xtime = 11;
+  int64 rctx = 12;
+  
+  // Class B/C timing
+  int64 gpstime = 13;
+  
+  // Override DR/Freq for Class B/C
+  uint32 dr = 14;
+  uint32 freq = 15;
+  
+  // MuxTime for RTT monitoring
+  double mux_time = 16;
+}
+
+// Schedule entry for multicast
+message ScheduleEntry {
+  // PHYPayload
+  bytes pdu = 1;
+  
+  // Data rate
+  uint32 dr = 2;
+  
+  // Frequency
+  uint32 freq = 3;
+  
+  // Priority
+  uint32 priority = 4;
+  
+  // GPS time for transmission
+  int64 gpstime = 5;
+  
+  // Radio context
+  int64 rctx = 6;
+}
+
+// Multicast schedule (msgtype: "dnsched")
+// Sent from LNS to Station for Class B/C multicast
+message DownlinkSchedule {
+  repeated ScheduleEntry schedule = 1;
+}
+
+// Run command (msgtype: "runcmd")
+// Sent from LNS to Station to execute a command
+message RunCommand {
+  // Command to execute
+  string command = 1;
+  
+  // Command arguments
+  repeated string arguments = 2;
+}
+
+// Remote shell data (msgtype: "rmtsh")
+// Bidirectional for remote shell session
+message RemoteShell {
+  // User operating the session (informational)
+  string user = 1;
+  
+  // TERM environment variable value
+  string term = 2;
+  
+  // Start session (LNS -> Station)
+  bool start = 3;
+  
+  // Stop session (LNS -> Station)
+  bool stop = 4;
+  
+  // Shell data (stdin from LNS, stdout/stderr to LNS)
+  bytes data = 5;
+}
+
+// Top-level wrapper message
+// All TC protocol messages are wrapped in this envelope
+message TcMessage {
+  // Message type discriminator
+  MsgType msg_type = 1;
+  
+  // Exactly one of the following will be set based on msg_type
+  oneof payload {
+    // Station -> LNS
+    UplinkDataFrame updf = 2;
+    JoinRequest jreq = 3;
+    ProprietaryFrame propdf = 4;
+    TxConfirmation dntxed = 5;
+    TimeSync timesync = 6;
+    
+    // LNS -> Station
+    DownlinkMessage dnmsg = 10;
+    DownlinkSchedule dnsched = 11;
+    RunCommand runcmd = 13;
+    RemoteShell rmtsh = 14;
+  }
+}

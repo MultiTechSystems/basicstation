@@ -102,22 +102,25 @@ CFG.debug   = logini_lvl=DEBUG selftests tlsdebug ral_lgw
 CFG.debugn  = logini_lvl=DEBUG selftests tlsdebug ral_master_slave
 
 # -- Platform specific
-CFG.linux   = linux lgw1 no_leds
-CFG.linuxpico = linux lgw1 no_leds smtcpico
-CFG.corecell = linux lgw1 no_leds sx1302
-CFG.rpi     = linux lgw1 no_leds
-CFG.rpi64   = linux lgw1 no_leds
-CFG.kerlink = linux lgw1 no_leds
+# protobuf enables binary TC protocol option
+CFG.linux   = linux lgw1 no_leds protobuf
+CFG.linuxpico = linux lgw1 no_leds smtcpico protobuf
+CFG.linuxV2 = linux lgw2 no_leds lgw2genkey protobuf
+CFG.corecell = linux lgw1 no_leds sx1302 protobuf
+CFG.rpi     = linux lgw1 no_leds protobuf
+CFG.rpi64   = linux lgw1 no_leds protobuf
+CFG.kerlink = linux lgw1 no_leds protobuf
 
 SD.default = src-linux
 
 SD = $(or ${SD.${platform}}, ${SD.default})
 
-DEPS.default = mbedtls lgw
-DEPS.linuxpico = mbedtls smtcpico
-DEPS.corecell = mbedtls lgw1302
-DEPS.rpi     = mbedtls lgw
-DEPS.rpi64   = mbedtls lgw
+DEPS.default = mbedtls lgw nanopb
+DEPS.linuxpico = mbedtls smtcpico nanopb
+DEPS.linuxV2 = mbedtls lgw2 nanopb
+DEPS.corecell = mbedtls lgw1302 nanopb
+DEPS.rpi     = mbedtls lgw nanopb
+DEPS.rpi64   = mbedtls lgw nanopb
 
 DEPS = $(or ${DEPS.${platform}}, ${DEPS.default})
 
@@ -144,12 +147,15 @@ CFLAGS.linux.testfs   = -g -O0 --coverage
 CFLAGS.linux.testpin  = -g -O3
 CFLAGS.linux.std      = -g -O3
 
-LIBS.linux   = -llgw   ${MBEDLIBS}      -lpthread
-LIBS.linuxpico = -llgw ${MBEDLIBS}      -lpthread
-LIBS.corecell = -llgw1302  ${MBEDLIBS}      -lpthread -lrt
-LIBS.rpi     = -llgw   ${MBEDLIBS}      -lpthread
-LIBS.rpi64   = -llgw   ${MBEDLIBS}      -lpthread
-LIBS.kerlink = -llgw   ${MBEDLIBS} -lrt -lpthread
+NANOPBLIBS = -lnanopb
+
+LIBS.linux   = -llgw   ${MBEDLIBS} ${NANOPBLIBS}      -lpthread
+LIBS.linuxV2 = -llgw2  ${MBEDLIBS} ${NANOPBLIBS} -lrt -lpthread -lspi
+LIBS.linuxpico = -llgw ${MBEDLIBS} ${NANOPBLIBS}      -lpthread
+LIBS.corecell = -llgw1302  ${MBEDLIBS} ${NANOPBLIBS}      -lpthread -lrt
+LIBS.rpi     = -llgw   ${MBEDLIBS} ${NANOPBLIBS}      -lpthread
+LIBS.rpi64   = -llgw   ${MBEDLIBS} ${NANOPBLIBS}      -lpthread
+LIBS.kerlink = -llgw   ${MBEDLIBS} ${NANOPBLIBS} -lrt -lpthread
 
 xCFG     =     ${CFG.${ARCH}}     ${CFG.${platform}}     ${CFG.${variant}}    ${CFG.${platform}.${variant}}
 xCFLAGS  =  ${CFLAGS.${ARCH}}  ${CFLAGS.${platform}}  ${CFLAGS.${variant}} ${CFLAGS.${platform}.${variant}}

@@ -43,6 +43,7 @@
 #include "uj.h"
 #include "kwcrc.h"
 #include "tc.h"
+#include "tcpb.h"
 
 
 #define UPBUFSZ   4096
@@ -321,6 +322,16 @@ int s2e_onBinary (s2ctx_t* s2ctx, u1_t* data, ujoff_t len) {
     if( len == 0 ) {
         return 1;
     }
+    
+#if defined(CFG_protobuf)
+    // Protobuf TcMessage starts with field 1 tag (0x08 for varint wire type)
+    // rmtsh data starts with session index (0..MAX_RMTSH-1)
+    // If protobuf is enabled and first byte looks like a protobuf tag, dispatch to protobuf handler
+    if( tcpb_enabled() && data[0] == 0x08 ) {
+        return s2e_handleProtobufMsg(s2ctx, data, len);
+    }
+#endif
+    
     if( data[0] >= MAX_RMTSH ) {
         LOG(MOD_S2E|ERROR, "Illegal rmtsh session: %d", data[0]);
         return 1;

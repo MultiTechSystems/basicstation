@@ -1,0 +1,6 @@
+tc.uri
+tc-bak.*
+spidev
+*.log
+*.pid
+__pycache__/
