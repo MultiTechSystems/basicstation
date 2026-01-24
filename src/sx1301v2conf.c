@@ -739,6 +739,16 @@ static void sx1301v2conf_challoc_cb (void* ctx, challoc_t* ch, int flag) {
 
     switch( flag ) {
     case CHALLOC_START: {
+        // Reset chip and channel config before channel allocation
+        // This ensures disabled chips/channels don't retain stale frequencies from previous configs
+        for( int i = 0; i < MAX_SX1301_NUM; i++ ) {
+            sx1301v2conf->sx1301[i].chipConf.enable = 0;
+            sx1301v2conf->sx1301[i].chipConf.freq_hz = 0;
+            for( int j = 0; j < SX1301AR_CHIP_CHAN_NB; j++ ) {
+                sx1301v2conf->sx1301[i].chanConfs[j].enable = 0;
+                sx1301v2conf->sx1301[i].chanConfs[j].freq_hz = 0;
+            }
+        }
         break;
     }
     case CHALLOC_CHIP_START: {
