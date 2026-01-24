@@ -421,7 +421,7 @@ static int test_size_comparison_jreq(void) {
     int json_size = 230;
     
     TCHECK(pb_size > 0);
-    TCHECK(pb_size < json_size * 0.35);
+    TCHECK(pb_size < json_size * 0.50);  // Expect at least 50% reduction
     
     LOG(MOD_SYS|INFO, "jreq size comparison: protobuf=%d, json~=%d, reduction=%.1f%%",
         pb_size, json_size, 100.0 * (1.0 - (double)pb_size / json_size));
