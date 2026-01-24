@@ -29,10 +29,6 @@
 #ifndef _ral_h_
 #define _ral_h_
 
-#if defined(CFG_lgw1) && defined(CFG_lgw2)
-#error Only one of the two params can be set: CFG_lgw1 CFG_lgw2
-#endif
-
 #include "s2e.h"
 #include "timesync.h"
 
