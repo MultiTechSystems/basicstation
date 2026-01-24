@@ -145,6 +145,29 @@ To apply changes:
 2. Run `bitbake <recipe> -c compile -f` to force recompile
 3. Run `bitbake <recipe>` to package
 
+### Quick Iterative Development
+
+For rapid development cycles, you can copy source files directly to the work directory
+and rebuild without going through the full bitbake fetch/unpack cycle.
+
+**Copy, build, and deploy in one shot:**
+```bash
+# Set variables (adjust for your environment)
+BUILDSERVER="user@buildserver"
+GATEWAY="user@gateway"
+WORKDIR="/path/to/mts-device/build/tmp/work/mtcdt-mlinux-linux-gnueabi/lora-basic-station-sx1303/<version>/git"
+RECIPE="lora-basic-station-sx1303"
+
+# Copy source, compile, and deploy
+scp src/*.c src/*.h src-linux/*.c src-linux/*.h $BUILDSERVER:$WORKDIR/src/ $BUILDSERVER:$WORKDIR/src-linux/ && \
+ssh $BUILDSERVER "cd /path/to/mts-device && export MACHINE=mtcdt && source oe-init-build-env build && bitbake $RECIPE -c compile -f" && \
+scp $BUILDSERVER:$WORKDIR/build-mlinux-sx1303/bin/station /tmp/station-test && \
+scp /tmp/station-test $GATEWAY:/tmp/station && \
+ssh $GATEWAY "sudo cp /tmp/station /opt/lora/station-sx1303 && sudo chmod +x /opt/lora/station-sx1303 && sudo /etc/init.d/lora-network-server restart"
+```
+
+Note: Replace paths, usernames, and server addresses with your actual values.
+
 ## Running Regression Tests
 
 ```bash
@@ -183,3 +206,41 @@ For a quick smoke test, run `test1-selftests`:
 cd regr-tests/test1-selftests
 TEST_VARIANT=testms1302 ./test.sh
 ```
+
+## Debugging on Gateway
+
+For debugging crashes on the gateway, you can install gdb via Yocto/Bitbake.
+
+### Building and Installing gdb
+
+```bash
+# Build gdb package
+cd /path/to/mts-device
+export MACHINE=mtcdt
+source oe-init-build-env build
+bitbake gdb
+
+# Find the generated IPK
+find build/tmp/deploy/ipk -name 'gdb*.ipk'
+# Example: build/tmp/deploy/ipk/arm926ejste/gdb_9.1-r0.0_arm926ejste.ipk
+
+# Copy to gateway and install
+scp build/tmp/deploy/ipk/arm926ejste/gdb_9.1-r0.0_arm926ejste.ipk user@gateway:/tmp/
+ssh user@gateway "sudo opkg install /tmp/gdb_9.1-r0.0_arm926ejste.ipk"
+```
+
+### Getting a Backtrace
+
+```bash
+# On gateway, run station under gdb
+cd /var/run/lora/1
+sudo gdb -batch -ex 'run' -ex 'bt' --args /opt/lora/station-sx1303 -l DEBUG
+
+# Or with core dump
+ulimit -c unlimited
+sudo /opt/lora/station-sx1303 -l DEBUG
+# After crash:
+sudo gdb /opt/lora/station-sx1303 core -ex 'bt' -batch
+```
+
+See also: https://www.multitech.net/developer/software/mlinux/mlinux-software-development/debugging-a-cc-application/
