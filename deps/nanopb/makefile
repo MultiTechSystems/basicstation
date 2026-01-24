@@ -41,8 +41,11 @@ ${PLT}: prep.sh
 	platform=${platform} variant=${variant} ./prep.sh
 	mkdir -p ${PLT}
 	${MAKE} -C . build-nanopb platform=${platform} variant=${variant}
+	${MAKE} -C . install-headers platform=${platform} variant=${variant}
 
 build-nanopb: ${PLT}/libnanopb.a
+
+install-headers: ${TD}/${BD}/lib/libnanopb.a $(patsubst %, ${NANOPBINC}/%, ${HFILES})
 
 ${PLT}/pb_encode.o: ${SD}/pb_encode.c
 	@mkdir -p ${@D}
@@ -76,4 +79,4 @@ clean:
 super-clean: clean
 	rm -rf git-repo platform-*
 
-.PHONY: all build-nanopb clean super-clean
+.PHONY: all build-nanopb install-headers clean super-clean
