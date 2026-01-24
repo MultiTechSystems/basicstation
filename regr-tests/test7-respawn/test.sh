@@ -42,9 +42,19 @@ function workerPid () {
 function validatePid () {
     # Make sure all running processes named station and /proc/self/exe (slave procs)
     # match all processes in process group listed in station-ap2.pid
+    # Note: Filter all matches by pgid to avoid matching unrelated processes
+    # (e.g., VS Code/Cursor shell processes that contain "station" in command args)
     local pid=$(cat station-ap2.pid)
-    cmp <(ps -eo pid,ppid,pgid,command | grep -P "station[ ]|/proc/self/ex[e]") \
-	<(ps -eo pid,ppid,pgid,command | grep "$pid[ ]")
+    # Get station processes: (station OR /proc/self/exe) filtered by station's pgid
+    # Use temp files instead of process substitution to avoid fd issues with make
+    local lhs=$(mktemp)
+    local rhs=$(mktemp)
+    ps -eo pid,ppid,pgid,command | awk -v pgid="$pid" '$3 == pgid' | grep -P "station[ ]|/proc/self/ex[e]" > "$lhs"
+    ps -eo pid,ppid,pgid,command | grep "$pid[ ]" > "$rhs"
+    cmp "$lhs" "$rhs"
+    local rc=$?
+    rm -f "$lhs" "$rhs"
+    return $rc
 }
 
 
@@ -66,7 +76,7 @@ echo "ws://localhost:6038" > tc.uri
 rm -f station.log
 banner 'Starting first daemon'
 station --temp . -d
-sleep 0.5
+sleep 1
 pid=$(cat station-ap2.pid)
 echo "Daemon station-ap2.pid=$pid"
 validatePid
@@ -96,7 +106,7 @@ banner 'Trying to start 3rd daemon with force - kill old one'
 pid=$(cat station-ap2.pid)
 echo " - old pid=$pid"
 station --temp . -d -f
-sleep 0.5
+sleep 1
 validatePid
 
 if (ps -eo pid,ppid,pgid,command | grep "$pid[ ]"); then
@@ -117,7 +127,8 @@ grep "$wpid2 started" station.log || (echo "Missing wpid2: $wpid2 started"; exit
 # Kill process group
 banner 'Kill daemon process group'
 ([ -f station-ap2.pid ] && kill -9 -- -$(cat station-ap2.pid)) || true
-if (ps -eo pid,ppid,pgid,command | grep "station[ ]"); then
+# Check no station binary processes remain (filter out shell commands containing "station")
+if (ps -eo pid,ppid,pgid,command | grep -P "bin/station[ ]|^[0-9 ]+station "); then
     echo "Kill process group failed"
     exit 1
 fi
