@@ -1,0 +1,34 @@
+# Nanopb options file for tc.proto
+# See: https://jpa.kapsi.fi/nanopb/docs/reference.html#proto-file-options
+
+# Max sizes for variable-length fields
+# These should match MAX_RXFRAME_LEN and similar constants
+
+# RadioMetadata - no variable fields, all fixed
+
+# UplinkDataFrame
+basicstation.UplinkDataFrame.fopts          max_size:16
+basicstation.UplinkDataFrame.frm_payload    max_size:256
+basicstation.UplinkDataFrame.pdu            max_size:256
+
+# JoinRequest - no variable fields needing limits
+
+# ProprietaryFrame  
+basicstation.ProprietaryFrame.frm_payload   max_size:256
+
+# DownlinkMessage
+basicstation.DownlinkMessage.pdu            max_size:256
+
+# DownlinkSchedule
+basicstation.DownlinkSchedule.schedule      max_count:16
+basicstation.ScheduleEntry.pdu              max_size:256
+
+# RunCommand
+basicstation.RunCommand.command             max_size:256
+basicstation.RunCommand.arguments           max_count:16
+basicstation.RunCommand.arguments           max_size:256
+
+# RemoteShell
+basicstation.RemoteShell.user               max_size:64
+basicstation.RemoteShell.term               max_size:32
+basicstation.RemoteShell.data               max_size:1024

@@ -80,6 +80,7 @@
 #define J_preamble             ((ujcrc_t)(0x05167D25))
 #define J_priority             ((ujcrc_t)(0xF00C8E15))
 #define J_pps                  ((ujcrc_t)(0x00707073))
+#define J_protocol_format      ((ujcrc_t)(0x2705D42A))
 #define J_radio                ((ujcrc_t)(0x6A861A03))
 #define J_radio_conf           ((ujcrc_t)(0xBA23370B))
 #define J_radio_init           ((ujcrc_t)(0xA4224015))

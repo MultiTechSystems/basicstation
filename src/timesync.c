@@ -32,6 +32,7 @@
 #include "tc.h"
 #include "timesync.h"
 #include "ral.h"
+#include "tcpb.h"
 #if defined(CFG_sx1302)
 #if defined(CFG_lgwsim)
 // Mock declaration for simulation builds
@@ -475,13 +476,28 @@ static void onTimesyncLns (tmr_t* tmr) {
         return;
     }
     wsBufFull = 0;
-    uj_encOpen(&sendbuf, '{');
-    uj_encKVn(&sendbuf,
-              "msgtype",   's', "timesync",
-              "txtime",    'I', rt_getTime(),
-              NULL);
-    uj_encClose(&sendbuf, '}');
-    (*s2ctx->sendText)(s2ctx, &sendbuf);
+#if defined(CFG_protobuf)
+    if( tcpb_enabled() ) {
+        int pblen = tcpb_encTimesync((u1_t*)sendbuf.buf, sendbuf.bufsize, 
+                                      (double)rt_getTime());
+        if( pblen > 0 ) {
+            sendbuf.pos = pblen;
+            (*s2ctx->sendBinary)(s2ctx, &sendbuf);
+        } else {
+            LOG(MOD_SYN|ERROR, "Failed to encode timesync to protobuf");
+            return;
+        }
+    } else
+#endif
+    {
+        uj_encOpen(&sendbuf, '{');
+        uj_encKVn(&sendbuf,
+                  "msgtype",   's', "timesync",
+                  "txtime",    'I', rt_getTime(),
+                  NULL);
+        uj_encClose(&sendbuf, '}');
+        (*s2ctx->sendText)(s2ctx, &sendbuf);
+    }
     ustime_t delay = syncLnsCnt % TIMESYNC_LNS_BURST ? TIMESYNC_LNS_RETRY : TIMESYNC_LNS_PAUSE;
     syncLnsCnt += 1;
     rt_setTimer(tmr, rt_micros_ahead(delay));
