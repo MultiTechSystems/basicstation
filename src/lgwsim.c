@@ -578,6 +578,13 @@ int lgw_sx1261_setconf (struct lgw_conf_sx1261_s *conf) {
     }
     return LGW_HAL_SUCCESS;
 }
+
+int lgw_ftime_setconf (struct lgw_conf_ftime_s *conf) {
+    if (conf && conf->enable) {
+        LOG(MOD_RAL|INFO, "Fine timestamp configured: mode=%d", conf->mode);
+    }
+    return LGW_HAL_SUCCESS;
+}
 #endif // CFG_sx1302
 
 str_t lgw_version_info () {

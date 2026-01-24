@@ -127,6 +127,8 @@ static void rx_polling (tmr_t* tmr) {
             resp.freq   = p->freq_hz;
 #if defined(CFG_sx1302)
             resp.rssi  = (u1_t)-p->rssis;
+            // Fine timestamp from SX1302/SX1303 - ftime in nanoseconds for TDOA geolocation
+            resp.fts = p->ftime_received ? (u4_t)p->ftime : -1;
 #else
             resp.rssi  = (u1_t)-p->rssi;
 #endif
@@ -242,7 +244,7 @@ static void pipe_read (aio_t* aio) {
                 u1_t ret = RAL_TX_OK;
                 if( err == LGW_HAL_SUCCESS ) {
                     ret = RAL_TX_OK;
-                #if defined(CFG_sx1302)
+#if defined(CFG_sx1302)
                 } else if( err == LGW_LBT_NOT_ALLOWED ) {
 #else
                 } else if( err == LGW_LBT_ISSUE ) {
@@ -260,6 +262,12 @@ static void pipe_read (aio_t* aio) {
                 off += sizeof(struct ral_config_req);
                 struct ral_config_req* confreq = (struct ral_config_req*)req;
                 struct sx130xconf sx1301conf;
+                memset(&sx1301conf, 0, sizeof(struct sx130xconf));
+
+                // set default antenna gain to 3.0 dBi
+                LOG(MOD_RAL|INFO, "Set default antenna gain to 3.0 dBi");
+                sx1301conf.txpowAdjust = 3.0 * TXPOW_SCALE;
+
                 int status = 0;
                 // Note: sx1301conf_start can take considerable amount of time (if LBT on up to 8s!!)
                 if( (status = !sx130xconf_parse_setup(&sx1301conf, sys_slaveIdx, confreq->hwspec, confreq->json, confreq->jsonlen)) ||

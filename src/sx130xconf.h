@@ -96,6 +96,20 @@ struct lgw_conf_sx1261_s {
 };
 
 int lgw_sx1261_setconf(struct lgw_conf_sx1261_s *conf);
+
+// Fine timestamp modes
+typedef enum {
+    LGW_FTIME_MODE_HIGH_CAPACITY,   // fine timestamps for SF5 -> SF10
+    LGW_FTIME_MODE_ALL_SF           // fine timestamps for SF5 -> SF12
+} lgw_ftime_mode_t;
+
+// Fine timestamp configuration
+struct lgw_conf_ftime_s {
+    bool enable;              // Enable / Disable fine timestamping
+    lgw_ftime_mode_t mode;    // Fine timestamping mode
+};
+
+int lgw_ftime_setconf(struct lgw_conf_ftime_s *conf);
 #endif // CFG_lgwsim
 #endif // CFG_sx1302
 
@@ -107,6 +121,7 @@ struct sx130xconf {
 #if !defined(CFG_sx1302)
     struct lgw_conf_lbt_s    lbt;
 #else
+    struct lgw_conf_ftime_s  ftime; // Fine timestamp structure for SX1302, SX1303
     struct lgw_conf_sx1261_s sx1261_cfg;
 #endif
     s2_t  txpowAdjust;   // assuming there is only one TX path / SX130X (scaled by TXPOW_SCALE)
