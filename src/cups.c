@@ -330,7 +330,7 @@ static void cups_update_info (conn_t* _conn, int ev) {
             cups->cstate = cstate = CUPS_FEED_CUPS_CRED;
             cups->temp_n = 0;
         }
-        assert(cstate > CUPS_HTTP_REQ_PEND || cstate < CUPS_DONE);
+        assert(cstate > CUPS_HTTP_REQ_PEND && cstate < CUPS_DONE);
         // Rewind timeout every time we get some data
         rt_setTimer(&cups->timeout, rt_micros_ahead(CUPS_CONN_TIMEOUT));
         int segm_len = cups->segm_len;
