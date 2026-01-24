@@ -41,7 +41,6 @@ variant  ?= std
 LOCAL_ARCH := $(shell gcc -dumpmachine)
 
 ARCH.linux   = x86_64-linux-gnu
-ARCH.linuxV2 = x86_64-linux-gnu
 ARCH.linuxpico = x86_64-linux-gnu
 ARCH.corecell  = arm-linux-gnueabihf
 ARCH.rpi     = arm-linux-gnueabihf
@@ -105,7 +104,6 @@ CFG.debugn  = logini_lvl=DEBUG selftests tlsdebug ral_master_slave
 # -- Platform specific
 CFG.linux   = linux lgw1 no_leds
 CFG.linuxpico = linux lgw1 no_leds smtcpico
-CFG.linuxV2 = linux lgw2 no_leds lgw2genkey
 CFG.corecell = linux lgw1 no_leds sx1302
 CFG.rpi     = linux lgw1 no_leds
 CFG.rpi64   = linux lgw1 no_leds
@@ -117,7 +115,6 @@ SD = $(or ${SD.${platform}}, ${SD.default})
 
 DEPS.default = mbedtls lgw
 DEPS.linuxpico = mbedtls smtcpico
-DEPS.linuxV2 = mbedtls lgw2
 DEPS.corecell = mbedtls lgw1302
 DEPS.rpi     = mbedtls lgw
 DEPS.rpi64   = mbedtls lgw
@@ -148,7 +145,6 @@ CFLAGS.linux.testpin  = -g -O3
 CFLAGS.linux.std      = -g -O3
 
 LIBS.linux   = -llgw   ${MBEDLIBS}      -lpthread
-LIBS.linuxV2 = -llgw2  ${MBEDLIBS} -lrt -lpthread -lspi
 LIBS.linuxpico = -llgw ${MBEDLIBS}      -lpthread
 LIBS.corecell = -llgw1302  ${MBEDLIBS}      -lpthread -lrt
 LIBS.rpi     = -llgw   ${MBEDLIBS}      -lpthread
