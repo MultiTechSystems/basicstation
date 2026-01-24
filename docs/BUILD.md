@@ -108,3 +108,12 @@ cd regr-tests
 # Run specific variant
 ./run-regression-tests --nohw --variant=testsim
 ```
+
+### Test Timing
+
+| Environment | Duration | Notes |
+|-------------|----------|-------|
+| GitHub CI (parallel) | ~5 minutes | Full suite across all variants |
+| Local (sequential) | ~3-4 minutes per test | Individual test case average |
+
+The `tls-cups` test takes the longest due to TLS handshake and certificate operations.
