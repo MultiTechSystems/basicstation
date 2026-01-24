@@ -263,6 +263,7 @@ static void pipe_read (aio_t* aio) {
                 off += sizeof(struct ral_config_req);
                 struct ral_config_req* confreq = (struct ral_config_req*)req;
                 struct sx130xconf sx1301conf;
+                memset(&sx1301conf, 0, sizeof(struct sx130xconf));
                 int status = 0;
                 // Note: sx1301conf_start can take considerable amount of time (if LBT on up to 8s!!)
                 if( (status = !sx130xconf_parse_setup(&sx1301conf, sys_slaveIdx, confreq->hwspec, confreq->json, confreq->jsonlen)) ||
