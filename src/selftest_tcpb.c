@@ -304,8 +304,8 @@ static int make_test_dnmsg(u1_t* buf, int bufsize) {
     
     // rx1freq (field 7)
     sub[subpos++] = (7 << 3) | 0;
-    sub[subpos++] = 0x90; sub[subpos++] = 0xEC; sub[subpos++] = 0x93;
-    sub[subpos++] = 0xDB; sub[subpos++] = 0x03;  // 868100000
+    sub[subpos++] = 0xA0; sub[subpos++] = 0xCF; sub[subpos++] = 0xF8;
+    sub[subpos++] = 0x9D; sub[subpos++] = 0x03;  // 868100000 varint
     
     // Write submessage length and content
     buf[pos++] = (u1_t)subpos;

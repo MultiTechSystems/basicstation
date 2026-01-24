@@ -399,6 +399,10 @@ typedef union {
 } tcpb_decoded_t;
 
 tcpb_msgtype_t tcpb_decode(const u1_t* data, int datalen, void* result) {
+    if (data == NULL || datalen <= 0) {
+        return TCPB_MSG_ERROR;
+    }
+    
     basicstation_TcMessage msg = basicstation_TcMessage_init_zero;
     
     pb_istream_t stream = pb_istream_from_buffer(data, datalen);

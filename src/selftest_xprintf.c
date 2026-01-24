@@ -28,6 +28,7 @@
 
 #include "selftests.h"
 #include "uj.h"
+#include "s2e.h"  // for SF/BW enums
 
 #define BUFSZ (2*1024)
 
@@ -87,10 +88,10 @@ void selftest_xprintf () {
     ustime_t t2 = (ustime_t)-1;
     xprintf(&B, "%T"     ,t2);                   TSTR("0000-00-00 00:00:00");
 
-    xprintf(&B, "%R"     ,0);                    TSTR("SF12/BW125");
-    xprintf(&B, "%R"     ,6);                    TSTR("FSK");
-    xprintf(&B, "%R"     ,(1<<3)|5);             TSTR("SF7/BW250");
-    xprintf(&B, "%R"     ,(2<<3)|4);             TSTR("SF8/BW500");
+    xprintf(&B, "%R"     ,rps_make(SF12, BW125)); TSTR("SF12/BW125");
+    xprintf(&B, "%R"     ,FSK);                  TSTR("FSK");
+    xprintf(&B, "%R"     ,rps_make(SF7, BW250)); TSTR("SF7/BW250");
+    xprintf(&B, "%R"     ,rps_make(SF8, BW500)); TSTR("SF8/BW500");
     xprintf(&B, "%^8R"   ,0xFF);                 TSTR("  SF??  ");
     xprintf(&B, "%F"     ,868300000);            TSTR("868.3MHz");
     xprintf(&B, "%~F"    ,868300000);            TSTR("868.3");
