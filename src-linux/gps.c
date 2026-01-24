@@ -691,7 +691,7 @@ static int gps_reopen () {
     }
 
 #if defined(CFG_usegpsd)
-    unsigned int flags;
+    unsigned int flags = 0;
     // flags |= WATCH_RAW;   /*  super-raw data (gps binary)  */
     flags |= WATCH_NMEA; /* raw NMEA */
     struct fixsource_t source;
@@ -705,8 +705,8 @@ static int gps_reopen () {
     (void)gps_stream(&gpsdata, flags, source.device);
 
 
-    // use device as dummy context
-    aio = aio_open(&device, fd, gps_pipe_read, NULL);
+    // use device as dummy context, fd comes from gpsdata
+    aio = aio_open(&device, gpsdata.gps_fd, gps_pipe_read, NULL);
     atexit(gps_pipe_close);
     gpsfill = 0;
     gps_pipe_read(aio);

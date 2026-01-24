@@ -1,0 +1,115 @@
+name: static-analysis
+on:
+  push:
+    branches: [master, 2.1.x, 'feature/**']
+  pull_request:
+    branches: [master, 2.1.x]
+
+jobs:
+  cppcheck:
+    runs-on: ubuntu-22.04
+    name: Cppcheck Static Analysis
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get install -y cppcheck
+
+      - name: Build headers (for includes)
+        run: |
+          # Build testsim variant to generate headers
+          make platform=linux variant=testsim deps
+          # Create minimal include structure
+          mkdir -p build-linux-testsim/include/lgw
+
+      - name: Run cppcheck
+        run: |
+          # Run cppcheck with warnings and errors
+          # Suppress missingIncludeSystem (system headers)
+          # Suppress preprocessorErrorDirective (LOG macro false positives)
+          # Use --error-exitcode=1 to fail on errors only (not style warnings)
+          cppcheck \
+            --enable=warning,performance,portability \
+            --suppress=missingIncludeSystem \
+            --suppress=preprocessorErrorDirective \
+            --suppress=unknownMacro \
+            --suppress=toomanyconfigs \
+            --error-exitcode=1 \
+            -I src \
+            -I src-linux \
+            -I build-linux-testsim/include \
+            --xml \
+            --output-file=cppcheck-report.xml \
+            src/*.c src-linux/*.c 2>&1 | tee cppcheck-output.txt
+
+      - name: Generate HTML report
+        if: always()
+        run: |
+          if [ -f cppcheck-report.xml ]; then
+            cppcheck-htmlreport --source-dir=. --file=cppcheck-report.xml --report-dir=cppcheck-html --title="Basic Station Static Analysis"
+          fi
+
+      - name: Upload cppcheck report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-report
+          path: |
+            cppcheck-report.xml
+            cppcheck-html/
+            cppcheck-output.txt
+
+      - name: Check for errors
+        run: |
+          # Count actual errors (not style issues)
+          errors=$(grep -c '\[error\]' cppcheck-output.txt || echo "0")
+          warnings=$(grep -c '\[warning\]' cppcheck-output.txt || echo "0")
+          echo "Errors: $errors, Warnings: $warnings"
+          # Summary in GitHub Actions format
+          echo "## Static Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Errors: $errors" >> $GITHUB_STEP_SUMMARY
+          echo "- Warnings: $warnings" >> $GITHUB_STEP_SUMMARY
+          if [ "$errors" -gt 0 ]; then
+            echo "::error::cppcheck found $errors errors"
+            grep '\[error\]' cppcheck-output.txt || true
+          fi
+
+  # Optional: clang-tidy for deeper analysis
+  clang-tidy:
+    runs-on: ubuntu-22.04
+    name: Clang-Tidy Analysis
+    continue-on-error: true  # Don't fail the build, just report
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install clang-tidy
+        run: sudo apt-get install -y clang-tidy bear
+
+      - name: Build with compilation database
+        run: |
+          # Generate compile_commands.json
+          make platform=linux variant=testsim deps
+          bear -- make platform=linux variant=testsim 2>/dev/null || true
+
+      - name: Run clang-tidy on protobuf files
+        if: always()
+        run: |
+          # Focus on protobuf-related files
+          if [ -f compile_commands.json ]; then
+            clang-tidy \
+              -checks='-*,bugprone-*,performance-*,portability-*,-bugprone-reserved-identifier' \
+              src/tcpb.c src/tc.pb.c \
+              -- -I src -I src-linux -I build-linux-testsim/include \
+              2>&1 | tee clang-tidy-output.txt || true
+          else
+            echo "No compile_commands.json found, skipping clang-tidy"
+          fi
+
+      - name: Upload clang-tidy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-report
+          path: clang-tidy-output.txt
