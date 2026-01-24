@@ -71,13 +71,6 @@ static void tc_muxs_connection (conn_t* _conn, int ev) {
         uj_encKV(&b, "model",    's', CFG_platform);
         uj_encKV(&b, "protocol", 'i', MUXS_PROTOCOL_VERSION);
         uj_encKV(&b, "features", 's', rt_features());
-#if defined(CFG_protobuf)
-        // Advertise protobuf capability
-        uj_encKey(&b, "capabilities");
-        uj_encOpen(&b, '[');
-        uj_encStr(&b, TCPB_CAPABILITY);
-        uj_encClose(&b, ']');
-#endif
         uj_encClose(&b, '}');
         ws_sendText(&tc->ws, &b);
         if( tc->credset == SYS_CRED_REG )

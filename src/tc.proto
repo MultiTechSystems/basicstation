@@ -62,7 +62,8 @@ message RadioMetadata {
   float snr = 7;
   
   // Fine timestamp for geolocation (-1 if not available)
-  int32 fts = 8;
+  // Using sint32 for efficient encoding of -1 sentinel value
+  sint32 fts = 8;
   
   // UTC receive time as Unix timestamp with fractional seconds
   double rxtime = 9;

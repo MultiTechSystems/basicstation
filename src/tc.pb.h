@@ -3,7 +3,7 @@
 
 #ifndef PB_BASICSTATION_TC_PB_H_INCLUDED
 #define PB_BASICSTATION_TC_PB_H_INCLUDED
-#include "pb.h"
+#include <pb.h>
 
 #if PB_PROTO_HEADER_VERSION != 40
 #error Regenerate this file with the current version of nanopb generator.
@@ -53,7 +53,8 @@ typedef struct _basicstation_RadioMetadata {
     int32_t rssi;
     /* SNR in dB (can be negative for weak signals) */
     float snr;
-    /* Fine timestamp for geolocation (-1 if not available) */
+    /* Fine timestamp for geolocation (-1 if not available)
+ Using sint32 for efficient encoding of -1 sentinel value */
     int32_t fts;
     /* UTC receive time as Unix timestamp with fractional seconds */
     double rxtime;
@@ -402,7 +403,7 @@ X(a, STATIC,   SINGULAR, INT64,    xtime,             4) \
 X(a, STATIC,   SINGULAR, INT64,    gpstime,           5) \
 X(a, STATIC,   SINGULAR, INT32,    rssi,              6) \
 X(a, STATIC,   SINGULAR, FLOAT,    snr,               7) \
-X(a, STATIC,   SINGULAR, INT32,    fts,               8) \
+X(a, STATIC,   SINGULAR, SINT32,   fts,               8) \
 X(a, STATIC,   SINGULAR, DOUBLE,   rxtime,            9)
 #define basicstation_RadioMetadata_CALLBACK NULL
 #define basicstation_RadioMetadata_DEFAULT NULL
@@ -565,16 +566,16 @@ extern const pb_msgdesc_t basicstation_TcMessage_msg;
 #define BASICSTATION_TC_PB_H_MAX_SIZE            basicstation_TcMessage_size
 #define basicstation_DownlinkMessage_size        372
 #define basicstation_DownlinkSchedule_size       4832
-#define basicstation_JoinRequest_size            127
-#define basicstation_ProprietaryFrame_size       351
-#define basicstation_RadioMetadata_size          81
+#define basicstation_JoinRequest_size            122
+#define basicstation_ProprietaryFrame_size       346
+#define basicstation_RadioMetadata_size          76
 #define basicstation_RemoteShell_size            1129
 #define basicstation_RunCommand_size             4386
 #define basicstation_ScheduleEntry_size          299
 #define basicstation_TcMessage_size              4837
 #define basicstation_TimeSync_size               31
 #define basicstation_TxConfirmation_size         62
-#define basicstation_UplinkDataFrame_size        667
+#define basicstation_UplinkDataFrame_size        662
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -1087,6 +1087,9 @@ static void startupMaster2 (tmr_t* tmr) {
     rt_addFeature("dutyconf");  // supports duty_cycle_enabled in router_config
     rt_addFeature("pdu-only");  // supports raw PDU mode via pdu_only in router_config
     rt_addFeature("lbtconf");  // supports explicit LBT channel configuration from LNS
+#if defined(CFG_protobuf)
+    rt_addFeature("protobuf");  // supports binary protobuf TC protocol
+#endif
 #if !defined(CFG_nogps)
     rt_addFeature("gps-ctrl");  // LNS can control GPS enable/disable
 #endif
