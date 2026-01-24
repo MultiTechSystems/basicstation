@@ -50,7 +50,9 @@ struct sx130xconf {
     struct lgw_tx_gain_lut_s txlut;
     struct lgw_conf_rxrf_s   rfconf[LGW_RF_CHAIN_NB];
     struct lgw_conf_rxif_s   ifconf[LGW_IF_CHAIN_NB];
-#if !defined(CFG_sx1302)
+#if defined(CFG_sx1302)
+    struct lgw_conf_ftime_s  ftime; // Fine timestamp structure for SX1302/SX1303
+#else
     struct lgw_conf_lbt_s    lbt;
 #endif
     s2_t  txpowAdjust;   // assuming there is only one TX path / SX130X (scaled by TXPOW_SCALE)

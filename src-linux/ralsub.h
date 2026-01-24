@@ -118,6 +118,7 @@ struct ral_rx_resp {
     rps_t rps;
     u4_t  freq;
     sL_t  xtime;
+    s4_t  fts;    // fine timestamp (nanoseconds), -1 if not available
     u1_t  rssi;   // scaled RSSI (*-1)
     s1_t  snr;    // scaled SNR (*8)
     u1_t  rxdata[MAX_RXFRAME_LEN];

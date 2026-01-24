@@ -125,6 +125,24 @@ void s2e_addRxjob (s2ctx_t* s2ctx, rxjob_t* rxjob) {
             memcmp(&s2ctx->rxq.rxdata[p->off], &s2ctx->rxq.rxdata[rxjob->off], rxjob->len) == 0 ) {
             // Duplicate detected - drop the mirror
             if( (8*rxjob->snr - rxjob->rssi) > (8*p->snr - p->rssi) ) {
+
+                if (p->fts > -1) {
+                    // Copy a fine timestamp from previous mirror frame if missing on the new one.
+                    // This can happen if the frame was received via multiple modems at the same time
+                    // and the (fine) timestamp flag is not set on the other modem.
+                    //
+                    // SX1303 Datasheet Rev 1.2 DS.SX1303.W.APP, Oct 2020 - 7. Detection Engine - Modems
+                    //      Timestamp for all Spreading Factors:
+                    //      Up to 8 packets at Spreading Factor SF5-12 can be received at any time,
+                    //      including, at most, 4 packets at SF11 and/or SF12.
+                    //      All these packets will be timestamped.
+
+                    if (rxjob->fts == -1) {
+                        LOG(MOD_S2E|DEBUG, "Copy the fine timestamp [%d] of the previous mirror frame before drop it.", p->fts);
+                        rxjob->fts = p->fts;
+                    }
+                }
+
                 // Drop previous frame p
                 LOG(MOD_S2E|DEBUG, "Dropped mirror frame freq=%F snr=%5.1f rssi=%d (vs. freq=%F snr=%5.1f rssi=%d) - DR%d mic=%d (%d bytes)",
                     p->freq, p->snr/4.0, -p->rssi, rxjob->freq, rxjob->snr/4.0, -rxjob->rssi,
@@ -156,8 +174,8 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
         rxjob_t* j = &s2ctx->rxq.rxjobs[s2ctx->rxq.first++];
         dbuf_t lbuf = { .buf = NULL };
         if( log_special(MOD_S2E|VERBOSE, &lbuf) )
-            xprintf(&lbuf, "RX %F DR%d %R snr=%.1f rssi=%d xtime=0x%lX - ",
-                    j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime);
+            xprintf(&lbuf, "RX %F DR%d %R snr=%.1f rssi=%d xtime=0x%lX fts=%d - ",
+                    j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime, j->fts);
 
         uj_encOpen(&sendbuf, '{');
         if( !s2e_parse_lora_frame(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len, lbuf.buf ? &lbuf : NULL) ) {
@@ -183,7 +201,8 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
                   /**/ "fts",     'i', j->fts,
                   /**/ "rssi",    'i', -(s4_t)j->rssi,
                   /**/ "snr",     'g', j->snr/4.0,
-                  /**/ "rxtime",  'T', rt_getUTC()/1e6,
+                  // Append fractional part of the fine timestamp (fts) to rxtime if available
+                  /**/ "rxtime",  j->fts > -1 ? 'F' : 'T', j->fts > -1 ? (sL_t)(rt_getUTC()/1e6) + (double)j->fts/1e9 : rt_getUTC()/1e6,
                   "}",
                   NULL);
         uj_encClose(&sendbuf, '}');

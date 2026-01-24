@@ -254,6 +254,20 @@ static void parse_sx130x_conf (ujdec_t* D, struct sx130xconf* sx130xconf) {
         }
         case J_pps: {
             sx130xconf->pps = uj_bool(D);
+
+#if defined(CFG_sx1302)
+            // Enable fine timestamping if PPS is enabled in station.conf
+            if (sx130xconf->pps == true) {
+                sx130xconf->ftime.enable = true;
+                sx130xconf->ftime.mode = LGW_FTIME_MODE_ALL_SF;  // fine timestamps for SF5 -> SF12
+
+                if (lgw_ftime_setconf(&sx130xconf->ftime) != LGW_HAL_SUCCESS) {
+                    LOG(MOD_RAL|ERROR, "Set fine timestamp -> lgw_ftime_setconf() failed.");
+                }
+                LOG(MOD_RAL|INFO, "Fine timestamp %s.", sx130xconf->pps == true ? "enabled" : "disabled");
+            }
+#endif
+
             break;
         }
         case J_clksrc: {
