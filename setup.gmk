@@ -44,6 +44,7 @@ ARCH.linux   = x86_64-linux-gnu
 ARCH.linuxpico = x86_64-linux-gnu
 ARCH.corecell  = arm-linux-gnueabihf
 ARCH.rpi     = arm-linux-gnueabihf
+ARCH.rpi64   = aarch64-linux-gnu
 ARCH.kerlink = arm-klk-linux-gnueabi
 ARCH=${ARCH.${platform}}
 
@@ -105,6 +106,7 @@ CFG.linux   = linux lgw1 no_leds
 CFG.linuxpico = linux lgw1 no_leds smtcpico
 CFG.corecell = linux lgw1 no_leds sx1302
 CFG.rpi     = linux lgw1 no_leds
+CFG.rpi64   = linux lgw1 no_leds
 CFG.kerlink = linux lgw1 no_leds
 
 SD.default = src-linux
@@ -115,6 +117,7 @@ DEPS.default = mbedtls lgw
 DEPS.linuxpico = mbedtls smtcpico
 DEPS.corecell = mbedtls lgw1302
 DEPS.rpi     = mbedtls lgw
+DEPS.rpi64   = mbedtls lgw
 
 DEPS = $(or ${DEPS.${platform}}, ${DEPS.default})
 
@@ -145,6 +148,7 @@ LIBS.linux   = -llgw   ${MBEDLIBS}      -lpthread
 LIBS.linuxpico = -llgw ${MBEDLIBS}      -lpthread
 LIBS.corecell = -llgw1302  ${MBEDLIBS}      -lpthread -lrt
 LIBS.rpi     = -llgw   ${MBEDLIBS}      -lpthread
+LIBS.rpi64   = -llgw   ${MBEDLIBS}      -lpthread
 LIBS.kerlink = -llgw   ${MBEDLIBS} -lrt -lpthread
 
 xCFG     =     ${CFG.${ARCH}}     ${CFG.${platform}}     ${CFG.${variant}}    ${CFG.${platform}.${variant}}

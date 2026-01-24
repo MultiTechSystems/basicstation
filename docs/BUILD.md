@@ -33,6 +33,57 @@ make platform=linux variant=testsim
 ls build-linux-testsim/bin/station
 ```
 
+## Building for Raspberry Pi
+
+Basic Station can be built natively on a Raspberry Pi for use with SX1301-based
+concentrators (e.g., RAK2245, IMST iC880A).
+
+### Platform Selection
+
+| Platform | Architecture | Raspberry Pi OS |
+|----------|--------------|-----------------|
+| `rpi` | arm-linux-gnueabihf | 32-bit (armhf) |
+| `rpi64` | aarch64-linux-gnu | 64-bit (arm64) |
+
+To check which architecture your Raspberry Pi is running:
+
+```bash
+gcc -dumpmachine
+# Returns: arm-linux-gnueabihf (32-bit) or aarch64-linux-gnu (64-bit)
+```
+
+### Build Commands
+
+```bash
+# For 64-bit Raspberry Pi OS
+make platform=rpi64 variant=std
+
+# For 32-bit Raspberry Pi OS
+make platform=rpi variant=std
+
+# Build output
+ls build-rpi64-std/bin/station
+```
+
+### Clean Rebuild
+
+If switching platforms or encountering build issues, clean the dependencies:
+
+```bash
+make super-clean
+make platform=rpi64 variant=std
+```
+
+### Running
+
+```bash
+cd examples/live-s2.sm.tc
+~/basicstation/build-rpi64-std/bin/station
+```
+
+Configure your station by editing `station.conf` and providing appropriate
+certificates and server URIs for your LoRaWAN Network Server.
+
 ## Building for MTCDT (Yocto/Bitbake)
 
 ### Hardware Mappings
