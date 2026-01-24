@@ -40,7 +40,29 @@ u1_t s2e_dcDisabled;    // no duty cycle limits - override for test/dev
 u1_t s2e_ccaDisabled;   // no LBT etc           - ditto
 u1_t s2e_dwellDisabled; // no dwell time limits - ditto
 u1_t s2e_pduOnly;       // send raw PDU instead of parsed LoRaWAN fields
+u1_t s2e_pduEncoding;   // 0=hex (default), 1=base64
 
+enum { PDU_ENC_HEX = 0, PDU_ENC_BASE64 = 1 };
+
+// Helper to calculate decoded PDU length from string length
+static int pdu_decoded_len(int str_len) {
+    if( s2e_pduEncoding == PDU_ENC_BASE64 ) {
+        // Base64: 4 chars -> 3 bytes (approximately, padding reduces slightly)
+        return (str_len * 3) / 4;
+    } else {
+        // Hex: 2 chars -> 1 byte
+        return str_len / 2;
+    }
+}
+
+// Helper to decode PDU string based on current encoding setting
+static int pdu_decode(ujdec_t* D, u1_t* buf, int bufsiz) {
+    if( s2e_pduEncoding == PDU_ENC_BASE64 ) {
+        return uj_base64str(D, buf, bufsiz);
+    } else {
+        return uj_hexstr(D, buf, bufsiz);
+    }
+}
 
 extern inline int   rps_sf   (rps_t params);
 extern inline int   rps_bw   (rps_t params);
@@ -361,11 +383,15 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
         uj_encOpen(&sendbuf, '{');
         if( s2e_pduOnly ) {
             // PDU-only mode: send raw frame without parsing into LoRaWAN fields
-            uj_encKVn(&sendbuf,
-                      "msgtype", 's', "updf",
-                      "pdu",     'H', j->len, &s2ctx->rxq.rxdata[j->off],
-                      NULL);
-            xprintf(&lbuf, "pdu-only %d bytes", j->len);
+            uj_encKV(&sendbuf, "msgtype", 's', "updf");
+            uj_encKey(&sendbuf, "pdu");
+            if( s2e_pduEncoding == PDU_ENC_BASE64 ) {
+                uj_encBase64(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len);
+            } else {
+                uj_encHex(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len);
+            }
+            xprintf(&lbuf, "pdu-only %d bytes (%s)", j->len,
+                    s2e_pduEncoding == PDU_ENC_BASE64 ? "base64" : "hex");
         } else {
             if( !s2e_parse_lora_frame(&sendbuf, &s2ctx->rxq.rxdata[j->off], j->len, lbuf.buf ? &lbuf : NULL) ) {
                 // Frame failed sanity checks or stopped by filters
@@ -1121,6 +1147,31 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
     s2ctx->txpow = 14 * TXPOW_SCALE;  // builtin default
     s2ctx->ccaEnabled = 0;            // reset CCA state for new router_config
 
+    // Reset feature flags to defaults - they must be explicitly set in each router_config
+    s2e_pduOnly = 0;
+    s2e_pduEncoding = PDU_ENC_HEX;
+    s2e_dcDisabled = 0;
+
+    // Reset duty cycle configuration to defaults
+    dc_mode = DC_MODE_LEGACY;
+    dc_window_us = (ustime_t)DC_DEFAULT_WINDOW_SECS * 1000000ULL;
+    dc_channel_limit_permille = 100;  // 10% default
+    // Reset band limits to EU868 defaults
+    dc_band_limits_permille[DC_BAND_K] = 1;    // 0.1%
+    dc_band_limits_permille[DC_BAND_L] = 10;   // 1%
+    dc_band_limits_permille[DC_BAND_M] = 10;   // 1%
+    dc_band_limits_permille[DC_BAND_N] = 1;    // 0.1%
+    dc_band_limits_permille[DC_BAND_P] = 100;  // 10%
+    dc_band_limits_permille[DC_BAND_Q] = 10;   // 1%
+
+    // Reset DR tables
+    for( u1_t i=0; i<DR_CNT; i++ ) {
+        s2ctx->dr_defs[i] = RPS_ILLEGAL;
+        s2ctx->dr_defs_up[i] = RPS_ILLEGAL;
+        s2ctx->dr_defs_dn[i] = RPS_ILLEGAL;
+    }
+    s2ctx->asymmetric_drs = 0;
+
     while( (field = uj_nextField(D)) ) {
         switch(field) {
         case J_freq_range: {
@@ -1498,6 +1549,21 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             LOG(MOD_S2E|INFO, "PDU-only mode %s", s2e_pduOnly ? "enabled" : "disabled");
             break;
         }
+        case J_pdu_encoding: {
+            str_t enc = uj_str(D);
+            if( strcmp(enc, "base64") == 0 || strcmp(enc, "b64") == 0 ) {
+                s2e_pduEncoding = PDU_ENC_BASE64;
+                LOG(MOD_S2E|INFO, "PDU encoding: base64");
+            } else {
+                s2e_pduEncoding = PDU_ENC_HEX;
+                if( strcmp(enc, "hex") != 0 ) {
+                    LOG(MOD_S2E|WARNING, "Unknown pdu_encoding '%s', using hex", enc);
+                } else {
+                    LOG(MOD_S2E|INFO, "PDU encoding: hex");
+                }
+            }
+            break;
+        }
         case J_lbt_enabled: {
             lbt_enabled_explicit = uj_bool(D) ? 2 : 1;
             break;
@@ -1676,12 +1742,39 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
     LOG(MOD_S2E|INFO, "Configuring for region: %s%s -- %F..%F",
         s2ctx->region_s, s2ctx->ccaEnabled ? " (CCA)":"", s2ctx->min_freq, s2ctx->max_freq);
     if( log_shallLog(MOD_S2E|INFO) ) {
-        for( int dr=0; dr<16; dr++ ) {
-            int rps = s2ctx->dr_defs[dr];
-            if( rps == RPS_ILLEGAL ) {
-                LOG(MOD_S2E|INFO, "  DR%-2d undefined", dr);
-            } else {
-                LOG(MOD_S2E|INFO, "  DR%-2d %R %s", dr, rps, rps & RPS_DNONLY ? "(DN only)" : "");
+        if( s2ctx->asymmetric_drs ) {
+            // Asymmetric DR tables (RP2 1.0.5+)
+            LOG(MOD_S2E|INFO, "Uplink datarates:");
+            for( int dr=0; dr<16; dr++ ) {
+                int rps = s2ctx->dr_defs_up[dr];
+                if( rps == RPS_ILLEGAL ) {
+                    LOG(MOD_S2E|INFO, "  DR%-2d undefined", dr);
+                } else if( rps == RPS_LRFHSS ) {
+                    LOG(MOD_S2E|INFO, "  DR%-2d LR-FHSS (unsupported)", dr);
+                } else {
+                    LOG(MOD_S2E|INFO, "  DR%-2d %R", dr, rps);
+                }
+            }
+            LOG(MOD_S2E|INFO, "Downlink datarates:");
+            for( int dr=0; dr<16; dr++ ) {
+                int rps = s2ctx->dr_defs_dn[dr];
+                if( rps == RPS_ILLEGAL ) {
+                    LOG(MOD_S2E|INFO, "  DR%-2d undefined", dr);
+                } else if( rps == RPS_LRFHSS ) {
+                    LOG(MOD_S2E|INFO, "  DR%-2d LR-FHSS (unsupported)", dr);
+                } else {
+                    LOG(MOD_S2E|INFO, "  DR%-2d %R", dr, rps);
+                }
+            }
+        } else {
+            // Symmetric DR table (legacy)
+            for( int dr=0; dr<16; dr++ ) {
+                int rps = s2ctx->dr_defs[dr];
+                if( rps == RPS_ILLEGAL ) {
+                    LOG(MOD_S2E|INFO, "  DR%-2d undefined", dr);
+                } else {
+                    LOG(MOD_S2E|INFO, "  DR%-2d %R %s", dr, rps, rps & RPS_DNONLY ? "(DN only)" : "");
+                }
             }
         }
         LOG(MOD_S2E|INFO,
@@ -1696,6 +1789,9 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             s2e_netidFilter[3], s2e_netidFilter[2], s2e_netidFilter[1], s2e_netidFilter[0]);
         LOG(MOD_S2E|INFO, "  Dev/test settings: nocca=%d nodc=%d nodwell=%d",
             (s2e_ccaDisabled!=0), (s2e_dcDisabled!=0), (s2e_dwellDisabled!=0));
+        if( s2e_pduOnly ) {
+            LOG(MOD_S2E|INFO, "  PDU-only mode: enabled");
+        }
     }
     if( (bcn.ctrl&0xF0) != 0 ) {
         // At least one beacon frequency was specified
@@ -1764,13 +1860,13 @@ void handle_dnframe (s2ctx_t* s2ctx, ujdec_t* D) {
         }
         case J_pdu: {
             uj_str(D);
-            int xlen = D->str.len/2;
+            int xlen = pdu_decoded_len(D->str.len);
             u1_t* p = txq_reserveData(&s2ctx->txq, xlen);
             if( p == NULL ) {
                 uj_error(D, "Out of TX data space");
                 return;
             }
-            txjob->len = uj_hexstr(D, p, xlen);
+            txjob->len = pdu_decode(D, p, xlen);
             flags |= 0x20;
             break;
         }
@@ -1845,7 +1941,7 @@ void handle_dnmsg (s2ctx_t* s2ctx, ujdec_t* D) {
         }
         case J_pdu: {
             uj_str(D);
-            int xlen = D->str.len/2;
+            int xlen = pdu_decoded_len(D->str.len);
             if( xlen > 255 ) {
                 uj_error(D, "TX pdu too large. Maximum is 255 bytes.");
                 return;
@@ -1855,7 +1951,7 @@ void handle_dnmsg (s2ctx_t* s2ctx, ujdec_t* D) {
                 uj_error(D, "Out of TX data space");
                 return;
             }
-            txjob->len = uj_hexstr(D, p, xlen);
+            txjob->len = pdu_decode(D, p, xlen);
             flags |= 0x08;
             break;
         }
@@ -2049,13 +2145,13 @@ void handle_dnsched (s2ctx_t* s2ctx, ujdec_t* D) {
                     }
                     case J_pdu: {
                         uj_str(D);
-                        int xlen = D->str.len/2;
+                        int xlen = pdu_decoded_len(D->str.len);
                         u1_t* p = txq_reserveData(&s2ctx->txq, xlen);
                         if( p == NULL ) {
                             uj_error(D, "Out of TX data space");
                             return;
                         }
-                        txjob->len = uj_hexstr(D, p, xlen);
+                        txjob->len = pdu_decode(D, p, xlen);
                         flags |= 0x08;
                         break;
                     }

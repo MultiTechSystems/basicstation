@@ -567,6 +567,32 @@ int uj_hexstr (ujdec_t* dec, u1_t* buf, int bufsiz) {
     return len/2;
 }
 
+// Use mbedTLS base64 decode - well-tested and already linked
+#include "mbedtls/base64.h"
+
+int uj_base64str (ujdec_t* dec, u1_t* buf, int bufsiz) {
+    ujtype_t t = uj_nextValue(dec);
+    if( t != UJ_STRING )
+        uj_error(dec,"Expecting a string value with base64 data");
+    char* s = dec->str.beg;
+    int len = dec->str.len;
+    
+    if( len == 0 )
+        return 0;
+    
+    size_t olen = 0;
+    int ret = mbedtls_base64_decode(buf, bufsiz, &olen, (const unsigned char*)s, len);
+    
+    if( ret == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL )
+        uj_error(dec,"Base64 string too long: decoded %d bytes, buffer is %d", (int)olen, bufsiz);
+    if( ret == MBEDTLS_ERR_BASE64_INVALID_CHARACTER )
+        uj_error(dec,"Base64 string contains invalid character");
+    if( ret != 0 )
+        uj_error(dec,"Base64 decode error: %d", ret);
+    
+    return (int)olen;
+}
+
 uL_t uj_eui (ujdec_t* dec) {
     ujtype_t t = uj_nextValue(dec);
     if( t == UJ_SNUM || t == UJ_UNUM )
@@ -831,6 +857,16 @@ void uj_encHex(ujbuf_t* b, const u1_t* d, int len) {
     anotherString(b);
     for( int i=0; i<len; i++ )
         addHex2(b, d[i]);
+    addChar(b, '"');
+}
+
+void uj_encBase64(ujbuf_t* b, const u1_t* d, int len) {
+    if( d == NULL ) {
+        uj_encNull(b);
+        return;
+    }
+    anotherString(b);
+    b64Encode(b, d, len);
     addChar(b, '"');
 }
 
@@ -1330,17 +1366,21 @@ int vxprintf(ujbuf_t* b, const char* fmt, va_list args) {
                 goto doneElem;
             }
             case 'R': {
+                // RPS format: bits 0-3 = SF enum (SF12=0..SF5=7, FSK=8, SFNIL=9)
+                //             bits 4-5 = BW enum (BW125=0, BW250=1, BW500=2, BWNIL=3)
                 doff_t beg = b->pos;
                 int rps = va_arg(args, int);
-                if( (rps&7) == 7 || (rps&0x18) == 0x18 ) {
-                    xputs(b, "SF??", -1);
-                }
-                else if( (rps&7) == 6 ) {
+                int sf_val = rps & 0xF;  // SF is in lower 4 bits
+                int bw_val = (rps >> 4) & 3;  // BW is in bits 4-5
+                if( sf_val == 8 ) {  // FSK
                     xputs(b, "FSK", -1);
                 }
+                else if( sf_val >= 9 || bw_val == 3 ) {  // SFNIL or BWNIL
+                    xputs(b, "SF??", -1);
+                }
                 else {
-                    u1_t sf = 12-(rps&7);
-                    u2_t bw = 125 * "\x01\x02\x04\x00"[(rps>>3)&3];
+                    u1_t sf = 12 - sf_val;  // SF12=0 -> 12, SF5=7 -> 5
+                    u2_t bw = 125 * "\x01\x02\x04\x00"[bw_val];
                     snXp(b, "SF%d/BW%d", sf, bw);
                 }
                 padField(b, beg, width, padding);

@@ -106,6 +106,7 @@ char*     uj_str    (ujdec_t*);
 uL_t      uj_eui    (ujdec_t*);
 ujcrc_t   uj_keyword(ujdec_t*);
 int       uj_hexstr (ujdec_t*, u1_t* buf, int bufsiz);
+int       uj_base64str (ujdec_t*, u1_t* buf, int bufsiz);
 ujcrc_t   uj_msgtype(ujdec_t*);
 void      uj_error  (ujdec_t*, str_t msg, ...);
 int       uj_indexedField (ujdec_t*, str_t prefix);  // common case in radio config files
@@ -127,6 +128,7 @@ void uj_encDate (ujbuf_t* buf, uL_t date);
 void uj_encKey  (ujbuf_t* buf, const char* key);
 void uj_encStr  (ujbuf_t* buf, const char* s);
 void uj_encHex  (ujbuf_t* buf, const u1_t* d, int len);
+void uj_encBase64(ujbuf_t* buf, const u1_t* d, int len);
 void uj_encEui  (ujbuf_t* buf, uL_t eui);
 void uj_encMac  (ujbuf_t* buf, uL_t mac);
 void uj_encId6  (ujbuf_t* buf, uL_t eui);

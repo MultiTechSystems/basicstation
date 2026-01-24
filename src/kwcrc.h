@@ -93,6 +93,7 @@
 #define J_P                    ((ujcrc_t)(0x00000050))
 #define J_pa_gain              ((ujcrc_t)(0xDEE8634E))
 #define J_pdu                  ((ujcrc_t)(0x00708461))
+#define J_pdu_encoding         ((ujcrc_t)(0xEC99B1D9))
 #define J_pdu_only             ((ujcrc_t)(0x9BE6B787))
 #define J_preamble             ((ujcrc_t)(0x05167D25))
 #define J_priority             ((ujcrc_t)(0xF00C8E15))

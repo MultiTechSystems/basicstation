@@ -188,6 +188,7 @@ extern u1_t s2e_dcDisabled;    // ignore duty cycle limits - override for test/d
 extern u1_t s2e_ccaDisabled;   // ignore busy channels - override for test/dev
 extern u1_t s2e_dwellDisabled; // ignore dwell time limits - override for test/dev
 extern u1_t s2e_pduOnly;       // send raw PDU instead of parsed LoRaWAN fields
+extern u1_t s2e_pduEncoding;   // 0=hex (default), 1=base64
 
 
 rps_t    s2e_dr2rps (s2ctx_t*, u1_t dr);

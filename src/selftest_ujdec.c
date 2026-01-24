@@ -590,6 +590,64 @@ static void test_sugar() {
     TCHECK(4 == uj_hexstr(&D, buf, sizeof(buf)));
     TCHECK(strcmp((const char*)buf, "ABC") == 0);
 
+    // ---------- uj_base64str (using mbedTLS)
+    u1_t b64buf[16];
+    
+    // Error cases
+    iniDecoder(&D,"null");
+    if( !uj_decode(&D) ) {
+        uj_base64str(&D, b64buf, sizeof(b64buf));
+        TFAIL("B64-1");          // LCOV_EXCL_LINE
+    }
+    iniDecoder(&D,"\"ABC!\"");   // Invalid character
+    if( !uj_decode(&D) ) {
+        uj_base64str(&D, b64buf, sizeof(b64buf));
+        TFAIL("B64-3");          // LCOV_EXCL_LINE
+    }
+    iniDecoder(&D,"\"QUJDQUJDQUJDQUJDQUJD\"");  // Too long for buffer (decodes to 15 bytes)
+    if( !uj_decode(&D) ) {
+        uj_base64str(&D, b64buf, 4);  // Only 4 bytes allowed
+        TFAIL("B64-4");          // LCOV_EXCL_LINE
+    }
+    
+    // Valid cases
+    iniDecoder(&D,"\"\"");       // Empty string
+    if( uj_decode(&D) )
+        TFAIL("B64-5");          // LCOV_EXCL_LINE
+    TCHECK(0 == uj_base64str(&D, b64buf, sizeof(b64buf)));
+    
+    iniDecoder(&D,"\"QUJD\"");   // "ABC" no padding
+    if( uj_decode(&D) )
+        TFAIL("B64-6");          // LCOV_EXCL_LINE
+    TCHECK(3 == uj_base64str(&D, b64buf, sizeof(b64buf)));
+    TCHECK(b64buf[0] == 'A' && b64buf[1] == 'B' && b64buf[2] == 'C');
+    
+    iniDecoder(&D,"\"QUI=\"");   // "AB" with 1 padding
+    if( uj_decode(&D) )
+        TFAIL("B64-7");          // LCOV_EXCL_LINE
+    TCHECK(2 == uj_base64str(&D, b64buf, sizeof(b64buf)));
+    TCHECK(b64buf[0] == 'A' && b64buf[1] == 'B');
+    
+    iniDecoder(&D,"\"QQ==\"");   // "A" with 2 padding
+    if( uj_decode(&D) )
+        TFAIL("B64-8");          // LCOV_EXCL_LINE
+    TCHECK(1 == uj_base64str(&D, b64buf, sizeof(b64buf)));
+    TCHECK(b64buf[0] == 'A');
+    
+    iniDecoder(&D,"\"AAECAw==\"");  // \x00\x01\x02\x03 binary data
+    if( uj_decode(&D) )
+        TFAIL("B64-9");          // LCOV_EXCL_LINE
+    TCHECK(4 == uj_base64str(&D, b64buf, sizeof(b64buf)));
+    TCHECK(b64buf[0] == 0x00 && b64buf[1] == 0x01 && b64buf[2] == 0x02 && b64buf[3] == 0x03);
+    
+    // Test with + and / characters (base64 special chars)
+    // +/+/ decodes to 0xFB 0xFF 0xBF (verified with Python base64.b64decode)
+    iniDecoder(&D,"\"+/+/\"");
+    if( uj_decode(&D) )
+        TFAIL("B64-10");         // LCOV_EXCL_LINE
+    TCHECK(3 == uj_base64str(&D, b64buf, sizeof(b64buf)));
+    TCHECK(b64buf[0] == 0xFB && b64buf[1] == 0xFF && b64buf[2] == 0xBF);
+
     // ---------- uj_msgtype
     iniDecoder(&D,"null");
     if( uj_decode(&D) )

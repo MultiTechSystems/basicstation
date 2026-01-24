@@ -8,11 +8,31 @@ This document describes the PDU-only mode feature for Basic Station, which allow
 
 **Configuration:** LNS sets `"pdu_only": true` in `router_config`
 
-**Message Format:**
+**Encoding Options:** PDU can be encoded as hex (default) or base64 via `"pdu_encoding": "base64"`
+
+**Scope:** The `pdu_encoding` setting applies to both directions:
+- **Uplinks (station → LNS):** Station encodes the `pdu` field using the configured encoding
+- **Downlinks (LNS → station):** Station decodes the `pdu` field using the configured encoding
+
+This ensures symmetry - when an LNS enables base64 encoding, both uplink and downlink messages use the same format.
+
+**Message Format (hex, default):**
 ```json
 {
   "msgtype": "updf",
   "pdu": "40AABBCCDD00010001A1B2C3D4E5F6",
+  "DR": 0,
+  "Freq": 902300000,
+  "RefTime": 1234567890.123,
+  "upinfo": { ... }
+}
+```
+
+**Message Format (base64):**
+```json
+{
+  "msgtype": "updf",
+  "pdu": "QKq7zN0AAQAB...",
   "DR": 0,
   "Freq": 902300000,
   "RefTime": 1234567890.123,
@@ -61,6 +81,27 @@ The LNS enables PDU-only mode by including `pdu_only` in the `router_config` mes
   ...
 }
 ```
+
+### PDU Encoding
+
+By default, PDU data is encoded as hexadecimal. To use base64 encoding (which is ~33% smaller), add the `pdu_encoding` field:
+
+```json
+{
+  "msgtype": "router_config",
+  "region": "US915",
+  "pdu_only": true,
+  "pdu_encoding": "base64",
+  ...
+}
+```
+
+| Encoding | `pdu_encoding` value | Output Size | Example (50 bytes) |
+|----------|---------------------|-------------|-------------------|
+| Hex | `"hex"` (default) | 2N characters | 100 characters |
+| Base64 | `"base64"` or `"b64"` | ~1.33N characters | 68 characters |
+
+**Size Reduction:** Base64 encoding reduces PDU field size by approximately **33%** compared to hex encoding.
 
 ### Feature Discovery
 
@@ -111,7 +152,9 @@ Data frames are parsed into individual fields:
 
 ### PDU-Only Mode (pdu_only: true)
 
-The raw frame is sent without field parsing:
+The raw frame is sent without field parsing.
+
+**Hex encoding (default):**
 
 ```json
 {
@@ -132,12 +175,33 @@ The raw frame is sent without field parsing:
 }
 ```
 
+**Base64 encoding (pdu_encoding: "base64"):**
+
+```json
+{
+  "msgtype": "updf",
+  "pdu": "QKq7zN0AAQABobbD1OX2qrvM3Q==",
+  "DR": 0,
+  "Freq": 902300000,
+  "RefTime": 1234567890.123,
+  "upinfo": {
+    "rctx": 0,
+    "xtime": 12345678901234,
+    "gpstime": 1234567890000000,
+    "fts": -1,
+    "rssi": -50,
+    "snr": 9.5,
+    "rxtime": 1234567890.456
+  }
+}
+```
+
 ### Field Description
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `msgtype` | string | Always `"updf"` for uplink data frames |
-| `pdu` | string | Raw frame as hexadecimal string |
+| `pdu` | string | Raw frame encoded as hex or base64 (depending on `pdu_encoding`) |
 | `DR` | integer | Datarate index |
 | `Freq` | integer | Frequency in Hz |
 | `RefTime` | number | Reference time (MuxTime + offset) |
@@ -159,20 +223,28 @@ The raw frame is sent without field parsing:
 
 ### Source Files
 
-- `src/s2e.h` - Declares `s2e_pduOnly` global flag
-- `src/s2e.c` - Implements flag, config parsing, and uplink handling
-- `src/kwlist.txt` - Defines `pdu_only` keyword for JSON parsing
+- `src/s2e.h` - Declares `s2e_pduOnly` and `s2e_pduEncoding` global flags
+- `src/s2e.c` - Implements flags, config parsing, uplink encoding, and downlink decoding
+- `src/uj.c` - Implements `uj_encBase64()` for encoding and `uj_base64str()` for decoding (uses mbedTLS)
+- `src/kwlist.txt` - Defines `pdu_only` and `pdu_encoding` keywords for JSON parsing
 - `src-linux/sys_linux.c` - Advertises `pdu-only` feature
+
+### Dependencies
+
+Base64 encoding/decoding uses the mbedTLS library (`mbedtls_base64_encode` and `mbedtls_base64_decode`), which is already linked for TLS support. This provides well-tested, standards-compliant base64 handling.
 
 ### Code Flow
 
 1. **Startup:** Station sends `version` message with `pdu-only` in features
-2. **Configuration:** LNS sends `router_config` with `pdu_only: true`
-3. **Parsing:** Station sets `s2e_pduOnly = 1` and logs mode change
+2. **Configuration:** LNS sends `router_config` with `pdu_only: true` and optionally `pdu_encoding: "base64"`
+3. **Parsing:** Station sets `s2e_pduOnly = 1` and `s2e_pduEncoding` based on config, logs mode change
 4. **Uplink:** When frame received:
-   - If `s2e_pduOnly`: Add `pdu` field with hex-encoded frame
+   - If `s2e_pduOnly`: Add `pdu` field with hex or base64 encoded frame (based on `s2e_pduEncoding`)
    - Otherwise: Call `s2e_parse_lora_frame()` to extract fields
-5. **Metadata:** DR, Freq, RefTime, upinfo added regardless of mode
+5. **Downlink:** When `dnmsg`/`dnframe`/`dnsched` received:
+   - Decode `pdu` field using hex or base64 (based on `s2e_pduEncoding`)
+6. **Metadata:** DR, Freq, RefTime, upinfo added regardless of mode
+7. **Reset:** On new `router_config`, both `s2e_pduOnly` and `s2e_pduEncoding` reset to defaults
 
 ### Filter Behavior
 
@@ -205,6 +277,10 @@ Raw PDUs are useful for debugging frame-level issues and maintaining complete pa
 ### 5. Constrained Gateways
 
 On resource-limited gateways, skipping frame parsing reduces CPU usage.
+
+### 6. Bandwidth-Constrained Backhaul
+
+For gateways with limited backhaul bandwidth (cellular, satellite), base64 encoding reduces message size by ~33% compared to hex encoding.
 
 ## Backward Compatibility
 

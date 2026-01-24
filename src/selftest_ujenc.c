@@ -81,6 +81,37 @@ static void test_simple_values() {
         "]";
     TCHECK(strcmp(T, B.buf) == 0);
 
+    // Test base64 encoding
+    B.pos = 0;
+    uj_encBase64(&B, (const u1_t*)"ABC", 3);  // "ABC" -> "QUJD"
+    TCHECK(xeos(&B) == 1);
+    TCHECK(strcmp("\"QUJD\"", B.buf) == 0);
+
+    B.pos = 0;
+    uj_encBase64(&B, (const u1_t*)"A", 1);  // 1 byte -> 4 chars with padding
+    TCHECK(xeos(&B) == 1);
+    TCHECK(strcmp("\"QQ==\"", B.buf) == 0);
+
+    B.pos = 0;
+    uj_encBase64(&B, (const u1_t*)"AB", 2);  // 2 bytes -> 4 chars with padding
+    TCHECK(xeos(&B) == 1);
+    TCHECK(strcmp("\"QUI=\"", B.buf) == 0);
+
+    B.pos = 0;
+    uj_encBase64(&B, (const u1_t*)"\x00\x01\x02\x03", 4);  // binary data
+    TCHECK(xeos(&B) == 1);
+    TCHECK(strcmp("\"AAECAw==\"", B.buf) == 0);
+
+    B.pos = 0;
+    uj_encBase64(&B, NULL, 0);  // NULL input -> null
+    TCHECK(xeos(&B) == 1);
+    TCHECK(strcmp("null", B.buf) == 0);
+
+    B.pos = 0;
+    uj_encBase64(&B, (const u1_t*)"", 0);  // empty -> empty string
+    TCHECK(xeos(&B) == 1);
+    TCHECK(strcmp("\"\"", B.buf) == 0);
+
     B.pos = 0;
     uj_encOpen (&B, '{');
     uj_encKey  (&B, "msgtype");
