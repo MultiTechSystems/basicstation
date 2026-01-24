@@ -281,3 +281,4 @@ LUT-BASE
 # device info
 capabilities
 
+protocol_format

@@ -55,8 +55,11 @@ void     sys_startupSlave (int rdfd, int wrfd);
 #if defined(CFG_usegpsd)
 int      sys_enableGPS ();
 #else
-int sys_enableGPS (str_t device);
+int      sys_enableGPS (str_t device);
 #endif
+void     sys_disableGPS ();
+int      sys_gpsEnabled ();
+int      sys_setGPSEnabled (int enabled);
 void     sys_enableCmdFIFO (str_t file);
 
 #endif // _sys_linux_h_

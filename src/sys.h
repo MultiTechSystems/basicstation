@@ -52,6 +52,10 @@ void  sys_seed (u1_t* seed, int len);       // sys provides high quality seeds t
 #endif
 sL_t  sys_time ();
 sL_t  sys_utc  ();  // native UTC time - return 0 if not avail.
+
+// GPS control - allows LNS to enable/disable GPS processing
+int   sys_gpsEnabled ();           // check if GPS is enabled
+int   sys_setGPSEnabled (int en);  // set GPS enabled state, returns 1 if changed
 uL_t  sys_eui  ();
 void  sys_usleep(sL_t us);
 

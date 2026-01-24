@@ -47,6 +47,15 @@ int sys_getLatLon (double* lat, double* lon) {
     LOG(MOD_GPS|ERROR, "GPS function not compiled.");
     return 0;
 }
+void sys_disableGPS () {
+    // No-op when GPS not compiled
+}
+int sys_gpsEnabled () {
+    return 0;  // GPS not available
+}
+int sys_setGPSEnabled (int enabled) {
+    return 0;  // No change possible
+}
 
 #else // ! defined(CFG_nogps)
 
@@ -107,6 +116,14 @@ static int      report_move;
 static int      last_reported_fix;
 static int      nofix_backoff;
 static ustime_t time_fixchange;
+
+// GPS control flags
+// gps_lns_enabled: LNS can disable GPS via router_config (overrides station.conf)
+//                  -1 = no LNS override (use station.conf setting)
+//                   0 = disabled by LNS
+//                   1 = enabled by LNS
+static s1_t gps_lns_override = -1;  // no override by default
+static u1_t gps_was_running = 0;    // track if GPS was running before LNS disable
 
 
 
@@ -774,6 +791,72 @@ int sys_enableGPS () {
         free(b.buf);
     }
     time_fixchange = rt_getTime();
+    return 1;
+}
+
+
+// Disable GPS - called when LNS sends gps_enable: false
+void sys_disableGPS () {
+    if( aio == NULL ) {
+        LOG(MOD_GPS|DEBUG, "GPS already stopped");
+        return;
+    }
+    LOG(MOD_GPS|INFO, "Stopping GPS");
+    gps_was_running = 1;
+    rt_clrTimer(&reopen_tmr);
+#if defined(CFG_usegpsd)
+    gps_pipe_close();
+#else
+    gps_close();
+#endif
+}
+
+
+// Check if GPS is enabled
+// Returns 1 if GPS should be active (LNS hasn't disabled it)
+// Returns 0 if GPS has been disabled by LNS
+int sys_gpsEnabled () {
+    // If LNS has sent an override, use that
+    // Otherwise GPS is considered enabled (station.conf controls initial startup)
+    if( gps_lns_override >= 0 )
+        return gps_lns_override;
+    return 1;  // no LNS override, GPS enabled by default
+}
+
+
+// Set GPS enabled state from LNS router_config
+// This OVERRIDES the station.conf setting
+// Returns 1 if state changed, 0 if no change
+int sys_setGPSEnabled (int enabled) {
+    int new_state = enabled ? 1 : 0;
+    int old_effective = sys_gpsEnabled();
+    
+    // Check if this is actually a change
+    if( gps_lns_override == new_state )
+        return 0;  // no change in LNS override
+    
+    gps_lns_override = new_state;
+    
+    // Only take action if effective state changed
+    if( old_effective == new_state )
+        return 0;  // effective state didn't change
+    
+    if( !new_state ) {
+        // LNS is disabling GPS - override station.conf
+        LOG(MOD_GPS|INFO, "GPS disabled by LNS (overrides station.conf)");
+        sys_disableGPS();
+    } else {
+        // LNS is re-enabling GPS
+        if( gps_was_running ) {
+            LOG(MOD_GPS|INFO, "GPS re-enabled by LNS");
+            gps_was_running = 0;
+            if( !gps_reopen() ) {
+                LOG(MOD_GPS|ERROR, "Failed to re-open GPS");
+            }
+        } else {
+            LOG(MOD_GPS|INFO, "GPS enabled by LNS (was not running)");
+        }
+    }
     return 1;
 }
 

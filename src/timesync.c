@@ -33,6 +33,7 @@
 #include "timesync.h"
 #include "ral.h"
 #include "tcpb.h"
+#include "sys.h"
 #if defined(CFG_sx1302) || defined(CFG_gps_recovery)
 #if defined(CFG_lgwsim)
 // Mock declaration for simulation builds
@@ -304,6 +305,10 @@ ustime_t ts_updateTimesync (u1_t txunit, int quality, const timesync_t* curr) {
     }
     // We update ppsSync only if we have two consecutive time syncs with valid PPS timestamps
     // and if they are apart ~1s - we might see weird values if no PPS pulse occurred during time sync span.
+    // Also skip PPS processing if GPS has been disabled by LNS (e.g., due to hardware issues)
+    if( !sys_gpsEnabled() ) {
+        goto done;  // GPS disabled by LNS - skip PPS processing
+    }
     if( !last->pps_xtime || !curr->pps_xtime ) {
         goto done;
     }
