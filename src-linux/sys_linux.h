@@ -53,6 +53,9 @@ dbuf_t   sys_checkFile (str_t filename);
 void     sys_writeFile (str_t filename, dbuf_t* data);
 void     sys_startupSlave (int rdfd, int wrfd);
 int      sys_enableGPS ();
+void     sys_disableGPS ();
+int      sys_gpsEnabled ();
+int      sys_setGPSEnabled (int enabled);
 void     sys_enableCmdFIFO (str_t file);
 
 #endif // _sys_linux_h_

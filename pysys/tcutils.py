@@ -272,6 +272,8 @@ class Muxs(ServerABC):
         self.homedir = homedir
         self.tlsidentity = tlsidentity
         self.router_config = router_config_EU863_6ch
+        self.gps_enable = None  # None = don't include, True/False = include in router_config
+        self.station_features = []  # features reported by station in version message
 
     async def start_server(self):
         logger.debug("  Starting MUXS (%s/%s) on Port %d" %(self.homedir, self.tlsidentity or "", self.port))
@@ -290,7 +292,20 @@ class Muxs(ServerABC):
         await self.handle_connection(ws)
 
     def get_router_config(self):
-        return { **self.router_config, 'MuxTime': time.time() }
+        config = { **self.router_config, 'MuxTime': time.time() }
+        # Add gps_enable if explicitly set (None = omit, True/False = include)
+        if self.gps_enable is not None:
+            config['gps_enable'] = self.gps_enable
+        return config
+
+    async def send_router_config(self, gps_enable=None):
+        """Send a new router_config, optionally with gps_enable setting"""
+        if gps_enable is not None:
+            self.gps_enable = gps_enable
+        config = self.get_router_config()
+        if self.ws:
+            await self.ws.send(json.dumps(config))
+            logger.debug('< MUXS: router_config (gps_enable=%s)', self.gps_enable)
 
     async def handle_binaryData(self, ws, data:bytes) -> None:
         pass
@@ -324,6 +339,11 @@ class Muxs(ServerABC):
 
     async def handle_version(self, ws, msg):
         logger.debug('> MUXS: Station Version: %r' % (msg,))
+        features = msg.get('features', '')
+        if features:
+            logger.info('  MUXS: Station features: %s' % features)
+        # Store features for test inspection
+        self.station_features = features.split() if features else []
 
     async def handle_timesync(self, ws, msg):
         logger.debug("> MUXS: %r", msg)

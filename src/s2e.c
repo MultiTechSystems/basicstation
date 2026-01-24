@@ -1083,6 +1083,15 @@ static int handle_router_config (s2ctx_t* s2ctx, ujdec_t* D) {
             break;
         }
 #endif // !defined(CFG_prod)
+        case J_gps_enable: {
+            // LNS can disable GPS processing (e.g., due to hardware issues)
+            int enabled = uj_bool(D);
+            if( sys_setGPSEnabled(enabled) ) {
+                LOG(MOD_S2E|INFO, "GPS %s by LNS via router_config",
+                    enabled ? "enabled" : "disabled");
+            }
+            break;
+        }
         case J_sx1301_conf:
         case J_SX1301_conf:
         case J_sx1302_conf:
