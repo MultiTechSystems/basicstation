@@ -272,6 +272,7 @@ class ProtobufDecoder:
             elif field == RM_SNR:
                 result['snr'] = sub.read_float()
             elif field == RM_FTS:
+                # fts is sint32 - uses zigzag encoding
                 result['fts'] = sub.read_svarint()
             elif field == RM_RXTIME:
                 result['rxtime'] = sub.read_double()
@@ -631,11 +632,30 @@ class TestMuxs(tu.Muxs):
         super().__init__(**kwargs)
         self.connected_gateways = {}
         self.protobuf_enabled = False
-        self.station_capabilities = []
+        self.station_features = []
         # Track last uplink timing for timesync xtime responses
         self.last_uplink_xtime = 0
         self.last_uplink_gpstime = 0
         self.last_uplink_time = 0  # local time when uplink received
+        # GPS toggle state
+        self.gps_enabled = True
+        self.gps_toggle_task = None
+        self.active_ws = None
+    
+    async def handle_ws(self, ws):
+        """Override base class to NOT send router_config before version message.
+        
+        We need to wait for the version message to know station capabilities
+        (protobuf support) before sending router_config with protocol_format.
+        """
+        path = tu.get_ws_path(ws)
+        logger.debug('. MUXS connect: %s' % (path,))
+        if path != '/router':
+            await ws.close(4000)
+            return
+        self.ws = ws
+        # Don't send router_config here - wait for handle_version
+        await self.handle_connection(ws)
     
     def get_router_config(self):
         # Select base region config based on region and asym_dr option
@@ -669,12 +689,12 @@ class TestMuxs(tu.Muxs):
             logger.info('PDU-only mode ENABLED')
         
         # Protobuf: only enable if station supports it and user requested it
-        if g_args.protobuf and 'protobuf' in self.station_capabilities:
+        if g_args.protobuf and 'protobuf' in self.station_features:
             config['protocol_format'] = 'protobuf'
             self.protobuf_enabled = True
             logger.info('Protobuf binary protocol ENABLED')
         elif g_args.protobuf:
-            logger.warning('Protobuf requested but station does not advertise protobuf capability')
+            logger.warning('Protobuf requested but station does not advertise protobuf feature')
             self.protobuf_enabled = False
         
         # Duty cycle: explicit on/off sends the field, None means don't send (use station default)
@@ -776,12 +796,21 @@ class TestMuxs(tu.Muxs):
         logger.info('  Features: %s', msg.get('features'))
         logger.info('  Protocol: %s', msg.get('protocol'))
         
-        # Check for capabilities (protobuf support)
-        self.station_capabilities = msg.get('capabilities', [])
-        if self.station_capabilities:
-            logger.info('  Capabilities: %s', ', '.join(self.station_capabilities))
+        # Parse features string for protobuf support
+        features_str = msg.get('features', '')
+        self.station_features = features_str.split() if features_str else []
+        if 'protobuf' in self.station_features:
+            logger.info('  Protobuf: supported')
         
         logger.info('='*60)
+        
+        # Store active websocket for GPS toggle
+        self.active_ws = ws
+        
+        # Reset uplink tracking for new session
+        self.last_uplink_xtime = 0
+        self.last_uplink_gpstime = 0
+        self.last_uplink_time = 0
         
         # Need to get router_config before calling parent, so capabilities are known
         rconf = self.get_router_config()
@@ -790,35 +819,69 @@ class TestMuxs(tu.Muxs):
         
         if self.protobuf_enabled:
             logger.info('Binary protocol mode active - expecting protobuf messages')
+        
+        # Start GPS toggle task if configured
+        if g_args.gps_toggle > 0 and self.gps_toggle_task is None:
+            self.gps_toggle_task = asyncio.create_task(self.gps_toggle_loop(ws))
+    
+    async def gps_toggle_loop(self, ws):
+        """Periodically toggle GPS enable/disable via router_config."""
+        interval = g_args.gps_toggle
+        logger.info('GPS toggle task started (interval=%ds)', interval)
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                self.gps_enabled = not self.gps_enabled
+                logger.info('='*40)
+                logger.info('GPS TOGGLE: %s', 'ENABLED' if self.gps_enabled else 'DISABLED')
+                logger.info('='*40)
+                # Send new router_config with updated gps_enable
+                rconf = self.get_router_config()
+                rconf['gps_enable'] = self.gps_enabled
+                await ws.send(json.dumps(rconf))
+                logger.info('< MUXS: router_config (gps_enable=%s)', self.gps_enabled)
+        except asyncio.CancelledError:
+            logger.info('GPS toggle task cancelled')
+        except Exception as e:
+            logger.error('GPS toggle task error: %s', e)
     
     async def handle_updf(self, ws, msg):
         import time
         
         # Track xtime and gpstime from uplink for timesync responses
         upinfo = msg.get('upinfo', {})
-        if upinfo.get('xtime'):
-            self.last_uplink_xtime = upinfo['xtime']
+        xtime = upinfo.get('xtime', 0)
+        if xtime:
+            self.last_uplink_xtime = xtime
             self.last_uplink_gpstime = upinfo.get('gpstime', 0)
             self.last_uplink_time = time.time()
+            
+            # Send LNS-initiated GPS time transfer per TC protocol spec
+            # This provides direct xtime->gpstime mapping using uplink's xtime
+            await self.send_timesync_transfer(ws, xtime)
+        
+        # Extract fts (fine timestamp) for monitoring
+        fts = upinfo.get('fts', -1)
+        fts_status = 'OK' if fts >= 0 else 'NONE'
         
         if g_args.pdu_only:
             # PDU-only mode - check what we got
             has_pdu = 'pdu' in msg
             has_parsed = 'MHdr' in msg or 'DevAddr' in msg
             if has_pdu and not has_parsed:
-                logger.info('UPLINK (pdu-only): freq=%s DR=%s pdu=%s...', 
-                           msg.get('Freq'), msg.get('DR'), msg.get('pdu', '')[:32])
+                logger.info('UPLINK (pdu-only): freq=%s DR=%s fts=%s (%s) pdu=%s...', 
+                           msg.get('Freq'), msg.get('DR'), fts, fts_status, msg.get('pdu', '')[:32])
             elif has_pdu and has_parsed:
                 logger.warning('UPLINK: Has both pdu and parsed fields (pdu_only may not be working)')
-                logger.info('  DevAddr=%08X FCnt=%d', msg.get('DevAddr', 0), msg.get('FCnt', 0))
+                logger.info('  DevAddr=%08X FCnt=%d fts=%s (%s)', msg.get('DevAddr', 0), msg.get('FCnt', 0), fts, fts_status)
             else:
-                logger.info('UPLINK: DevAddr=%08X FCnt=%d freq=%s DR=%s', 
+                logger.info('UPLINK: DevAddr=%08X FCnt=%d freq=%s DR=%s fts=%s (%s)', 
                            msg.get('DevAddr', 0), msg.get('FCnt', 0),
-                           msg.get('Freq'), msg.get('DR'))
+                           msg.get('Freq'), msg.get('DR'), fts, fts_status)
         else:
-            logger.info('UPLINK: DevAddr=%08X FCnt=%d freq=%s DR=%s', 
+            logger.info('UPLINK: DevAddr=%08X FCnt=%d freq=%s DR=%s fts=%s (%s)', 
                        msg.get('DevAddr', 0), msg.get('FCnt', 0),
-                       msg.get('Freq'), msg.get('DR'))
+                       msg.get('Freq'), msg.get('DR'), fts, fts_status)
         
         # Auto-downlink mode: send a test downlink for each uplink
         if g_args.auto_downlink:
@@ -1020,24 +1083,40 @@ class TestMuxs(tu.Muxs):
     async def send_timesync_response_pb(self, ws, txtime: float, xtime: int):
         """Send timesync response in protobuf format.
         
-        The xtime field allows the station to directly map xtime to gpstime.
-        We calculate xtime by extrapolating from the last uplink's xtime/gpstime,
-        using the elapsed time since that uplink was received.
+        Per the TC protocol spec (https://doc.sm.tc/station/tcproto.html):
+        
+        Station-initiated timesync (this function):
+          Station sends: {"msgtype":"timesync", "txtime":INT64}
+          LNS responds:  {"msgtype":"timesync", "txtime":INT64, "gpstime":INT64}
+          
+        The LNS echoes txtime and adds gpstime. This is for round-trip calculation.
+        Do NOT include xtime here - that's for a separate LNS-initiated transfer.
         """
-        import time
         from datetime import datetime
         gpstime = int(((datetime.utcnow() - tu.GPS_EPOCH).total_seconds() + tu.UTC_GPS_LEAPS) * 1e6)
         
-        # Calculate xtime to return - extrapolate from last uplink
-        response_xtime = 0
-        if self.last_uplink_xtime and self.last_uplink_time:
-            elapsed_us = int((time.time() - self.last_uplink_time) * 1e6)
-            response_xtime = self.last_uplink_xtime + elapsed_us
+        enc = ProtobufEncoder()
+        # Per protocol: only txtime + gpstime in response to station-initiated timesync
+        data = enc.encode_timesync_response(gpstime, txtime, 0)
+        await ws.send(data)
+        logger.debug('< MUXS: timesync response (protobuf, gpstime=%d)', gpstime)
+    
+    async def send_timesync_transfer(self, ws, xtime: int):
+        """Send LNS-initiated GPS time transfer.
+        
+        Per the TC protocol spec:
+          LNS sends periodically: {"msgtype":"timesync", "xtime":INT64, "gpstime":INT64}
+          
+        The xtime comes from recent uplinks. This provides direct xtime->gpstime mapping.
+        """
+        from datetime import datetime
+        gpstime = int(((datetime.utcnow() - tu.GPS_EPOCH).total_seconds() + tu.UTC_GPS_LEAPS) * 1e6)
         
         enc = ProtobufEncoder()
-        data = enc.encode_timesync_response(gpstime, txtime, response_xtime)
+        # Per protocol: xtime + gpstime for LNS-initiated transfer (no txtime)
+        data = enc.encode_timesync_response(gpstime, 0, xtime)
         await ws.send(data)
-        logger.debug('< MUXS: timesync response (protobuf, %d bytes, xtime=%d)', len(data), response_xtime)
+        logger.debug('< MUXS: timesync transfer (protobuf, xtime=0x%X, gpstime=%d)', xtime, gpstime)
     
     async def handle_binaryData(self, ws, data: bytes):
         """Handle binary (protobuf) messages from station."""
@@ -1170,6 +1249,8 @@ if __name__ == '__main__':
                        help='Disable radio_1 for 3-channel mode. Use "bad" for incomplete config (only disables radio_1)')
     parser.add_argument('--tls', action='store_true', help='Enable TLS')
     parser.add_argument('--verbose', action='store_true', help='Verbose logging')
+    parser.add_argument('--gps-toggle', type=int, metavar='SECS', default=0,
+                       help='Toggle GPS enable/disable every N seconds (0=disabled)')
     
     args = parser.parse_args()
     
