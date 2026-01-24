@@ -114,6 +114,21 @@ cd regr-tests
 | Environment | Duration | Notes |
 |-------------|----------|-------|
 | GitHub CI (parallel) | ~5 minutes | Full suite across all variants |
-| Local (sequential) | ~3-4 minutes per test | Individual test case average |
+| Local (single variant) | ~15-20 minutes | All tests for one variant |
 
-The `tls-cups` test takes the longest due to TLS handshake and certificate operations.
+Individual test durations (testms1302 variant):
+
+| Test | Duration | Notes |
+|------|----------|-------|
+| test1-selftests | ~6s | Quick sanity check |
+| test2-pps | ~12s | PPS timing tests |
+| test3-updn-tls | ~80s | TLS handshake overhead |
+| test4-cups | ~46s | CUPS update protocol |
+| test7-respawn | ~7s | Daemon restart |
+
+For a quick smoke test, run `test1-selftests`:
+
+```bash
+cd regr-tests/test1-selftests
+TEST_VARIANT=testms1302 ./test.sh
+```
