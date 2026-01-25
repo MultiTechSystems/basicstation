@@ -289,6 +289,34 @@ For gateways with limited backhaul bandwidth (cellular, satellite), base64 encod
 - **Old stations:** Will ignore unknown `pdu_only` field in router_config
 - **Old LNS:** Will not send `pdu_only`, so station uses standard parsing
 
+## Protobuf Integration
+
+PDU-only mode works with the protobuf binary protocol for maximum efficiency:
+
+```json
+{
+  "msgtype": "router_config",
+  "pdu_only": true,
+  "protocol_format": "protobuf",
+  ...
+}
+```
+
+In this mode:
+- Uplinks are encoded as protobuf with raw PDU bytes (not hex or base64)
+- RadioMetadata uses optimized sint32 encoding for RSSI/SNR
+- Combined savings: ~80% bandwidth reduction vs JSON parsed mode
+
+| Format | Size | vs JSON Parsed |
+|--------|------|----------------|
+| JSON (parsed) | ~325 bytes | baseline |
+| JSON (pdu-only hex) | ~254 bytes | -22% |
+| JSON (pdu-only base64) | ~210 bytes | -35% |
+| Protobuf (parsed) | ~90 bytes | -72% |
+| **Protobuf (pdu-only)** | **~80 bytes** | **-75%** |
+
+See [Protobuf-TC-Protocol.md](Protobuf-TC-Protocol.md) for full protocol details.
+
 ## Security Considerations
 
 PDU-only mode forwards all received frames without validation. The LNS must:

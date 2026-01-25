@@ -323,6 +323,48 @@ rps_t s2e_dr2rps_dn (s2ctx_t* s2ctx, u1_t dr) {
 }
 ```
 
+### Critical Bug Fix: Channel Allocation with Asymmetric DRs
+
+**Problem:** Channel allocation functions (`any125kHz`, `hasFastLora`, `hasFSK`) were using `s2e_dr2rps()` which only reads from `dr_defs[]`. With asymmetric DRs, `dr_defs[]` is empty - DRs are stored in `dr_defs_up[]` and `dr_defs_dn[]` instead.
+
+**Symptoms:**
+- Radios remain disabled (`RF0: disabled`)
+- Bogus frequencies displayed (e.g., `4294.567296MHz`)
+- `Concentrator start failed` errors
+- Channel allocation silently fails
+
+**Fix:** All channel allocation functions now use `s2e_dr2rps_up()` for uplink operations:
+
+```c
+// BEFORE (buggy):
+static bool any125kHz(s2ctx_t* s2ctx, int minDR, int maxDR, ...) {
+    for (int dr = minDR; dr <= maxDR; dr++) {
+        rps_t rps = s2e_dr2rps(s2ctx, dr);  // BUG: uses dr_defs[]
+        ...
+    }
+}
+
+// AFTER (fixed):
+static bool any125kHz(s2ctx_t* s2ctx, int minDR, int maxDR, ...) {
+    for (int dr = minDR; dr <= maxDR; dr++) {
+        rps_t rps = s2e_dr2rps_up(s2ctx, dr);  // Uses dr_defs_up[]
+        ...
+    }
+}
+```
+
+Similarly, TX operations (logging, airtime calculation) now use `s2e_dr2rps_dn()`:
+
+| Operation | Function | Correct API |
+|-----------|----------|-------------|
+| RX logging | `s2e_flushRxjobs()` | `s2e_dr2rps_up()` |
+| Channel allocation | `any125kHz()`, `hasFastLora()`, `hasFSK()` | `s2e_dr2rps_up()` |
+| TX logging | `send_dntxed()`, `s2e_nextTxAction()` | `s2e_dr2rps_dn()` |
+| Airtime calculation | `updateAirtimeTxpow()` | `s2e_dr2rps_dn()` |
+| Radio TX | `ral_lgw.c`, `ral_master.c` | `s2e_dr2rps_dn()` |
+
+**Unit Tests:** `src/selftest_s2e.c` verifies correct behavior with both symmetric and asymmetric DRs.
+
 ### Parsing in `router_config`
 
 ```c

@@ -66,11 +66,16 @@ message RadioMetadata {
   int64 rctx = 3;          // Radio context
   int64 xtime = 4;         // Internal timestamp
   int64 gpstime = 5;       // GPS time (microseconds since epoch)
-  int32 rssi = 6;          // RSSI (negative dBm)
-  float snr = 7;           // SNR
-  int32 fts = 8;           // Fine timestamp (-1 if unavailable)
+  sint32 rssi = 6;         // RSSI in dBm (zigzag encoded for efficient negative values)
+  sint32 snr = 7;          // SNR in centibels (dB * 10, zigzag encoded)
+  sint32 fts = 8;          // Fine timestamp (-1 if unavailable)
   double rxtime = 9;       // UTC receive time
 }
+
+// Note: RSSI and SNR optimizations
+// - RSSI uses sint32 with zigzag encoding: -92 dBm encodes as 183 (1 byte varint)
+// - SNR uses centibels (dB * 10) as sint32: -7.5 dB = -75 cB encodes as 149 (1 byte)
+// - This is more efficient than float (4 bytes) for typical LoRaWAN signal levels
 
 // Uplink data frame (replaces msgtype:"updf")
 message UplinkDataFrame {

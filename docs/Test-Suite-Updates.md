@@ -168,8 +168,56 @@ cd regr-tests
 ./run-tests-core --nobuild --ghactions --variant=testms
 ```
 
+## Debugging Methodology: Tests First
+
+When debugging issues, follow the "Tests First" approach rather than searching through code:
+
+1. **Hypothesis from symptoms** - Form a hypothesis about what's failing
+2. **Write a minimal test** - Create a selftest that exercises that code path
+3. **Test proves/disproves** - If the test fails as expected, you've found the bug
+4. **Fix verified by test** - The same test validates the fix
+
+### Example: Adding a Bug-Finding Test
+
+```bash
+# 1. Create test file
+vi src/selftest_mytest.c
+
+# 2. Add to selftests.h
+extern void selftest_mytest();
+
+# 3. Add to selftests.c array
+selftest_mytest,
+
+# 4. Build and run
+make platform=linux variant=testsim
+cd regr-tests/test1-selftests
+STATION_SELFTESTS=1 ../../build-linux-testsim/bin/station -p
+```
+
+### Example: selftest_s2e.c
+
+The `selftest_s2e.c` file demonstrates this methodology for the asymmetric DR channel allocation bug:
+
+```c
+// Test the ACTUAL production functions via test wrappers
+bool production = s2e_test_any125kHz(&s2ctx, 0, 8, &min_rps, &max_rps);
+
+// Compare against BUGGY replicas to prove the bug pattern exists
+bool buggy = test_any125kHz_buggy(&s2ctx, 0, 8);
+
+// Production must differ from buggy when fix is applied
+TCHECK(production != buggy);
+```
+
+This approach:
+- Tests the real production code via wrappers
+- Compares against buggy replicas to prove the bug exists
+- Verified to fail when the bug is reintroduced
+
 ## Compatibility Notes
 
 - The test suite is backward compatible with existing test scripts
 - SF5/SF6 tests only run on 1302 variants (testsim1302, testms1302)
 - All variants run the same core test suite
+- New selftests can be added by creating `src/selftest_*.c` files

@@ -4,11 +4,46 @@ This document describes the GPS/PPS recovery feature for SX1302/SX1303 gateways.
 
 ## Overview
 
-This feature improves timing reliability by detecting and recovering from GPS/PPS synchronization issues on SX1302/SX1303 hardware.
+This feature improves timing reliability by detecting and recovering from GPS/PPS synchronization issues on SX1302/SX1303 hardware. It also provides LNS control over GPS functionality via the `gps_enable` field in `router_config`.
 
 ## Features
 
-### 1. PPS Reset Recovery (SX1302/SX1303 only)
+### 1. GPS Control via LNS (`gps-ctrl`)
+
+The LNS can enable or disable GPS processing via the `gps_enable` field in `router_config`:
+
+```json
+{
+  "msgtype": "router_config",
+  "gps_enable": false,
+  ...
+}
+```
+
+**Feature Flag:** `gps-ctrl` - Indicates station supports LNS-controlled GPS enable/disable.
+
+**Use Cases:**
+- Disable GPS when hardware issues are detected
+- Reduce power consumption when GPS is not needed
+- Troubleshoot timing issues by isolating GPS from PPS
+
+**Behavior:**
+- When disabled: GPS device connection is stopped, no NMEA parsing
+- PPS processing continues based on HAL availability (independent of GPS)
+- Station logs: `"GPS disabled by LNS via router_config"`
+
+### 2. Session Change Detection (Slave Restart)
+
+When a slave process restarts (session ID changes), the station detects this and resets timing state:
+
+- Detects session change via `ral_xtime2sess()` comparison
+- Resets drift statistics for affected txunit
+- For primary slave (txunit 0): resets PPS/GPS sync state entirely
+- Logs: `"Primary slave restarted - PPS/GPS sync reset, will re-acquire"`
+
+This prevents timing errors caused by comparing xtimes from different sessions.
+
+### 3. PPS Reset Recovery (SX1302/SX1303 only)
 
 When the PPS (Pulse Per Second) signal is lost for an extended period, the station will attempt to recover by resetting the GPS synchronization:
 
@@ -79,9 +114,24 @@ Station exits after 15 consecutive drift failures.
 
 ## Implementation Details
 
-The changes are in `src/timesync.c`:
+### Source Files
+
+- `src/timesync.c` - PPS recovery, session detection, drift monitoring
+- `src/s2e.c` - `gps_enable` field parsing from router_config
+- `src-linux/sys_linux.c` - GPS device control, `gps-ctrl` feature flag
+
+### Key Changes
 
 1. Added `loragw_sx1302.h` include for `sx1302_gps_enable()`
-2. Added static variables to track reset state
-3. Added PPS reset logic in the PPS rejection path
-4. Added excessive drift exit after threshold exceeded
+2. Added session change detection via `ral_xtime2sess()` comparison
+3. Added static variables to track reset state
+4. Added PPS reset logic in the PPS rejection path
+5. Added excessive drift exit after threshold exceeded
+6. Added `gps_enable` field parsing in `handle_router_config()`
+7. Added `sys_setGPSEnabled()` for LNS GPS control
+
+### router_config Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `gps_enable` | boolean | Enable/disable GPS processing (default: current state) |
