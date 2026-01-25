@@ -150,23 +150,120 @@ To apply changes:
 For rapid development cycles, you can copy source files directly to the work directory
 and rebuild without going through the full bitbake fetch/unpack cycle.
 
-**Copy, build, and deploy in one shot:**
-```bash
-# Set variables (adjust for your environment)
-BUILDSERVER="user@buildserver"
-GATEWAY="user@gateway"
-WORKDIR="/path/to/mts-device/build/tmp/work/mtcdt-mlinux-linux-gnueabi/lora-basic-station-sx1303/<version>/git"
-RECIPE="lora-basic-station-sx1303"
+**Important Notes:**
+- Do NOT use `bitbake -c clean` as it removes the source directory with your changes
+- To force a full recompile, remove object files: `rm -f $WORKDIR/build-mlinux-sx1303/s2core/*.o`
+  - Note: Use `rm -f` not `rm -rf` to avoid shell glob issues over SSH
+- If changing `.proto` files, regenerate the protobuf C files locally first (see Protobuf section below)
+- The gateway requires `sudo` for deployment; use `echo 'password' | sudo -S` for non-interactive sudo
 
-# Copy source, compile, and deploy
-scp src/*.c src/*.h src-linux/*.c src-linux/*.h $BUILDSERVER:$WORKDIR/src/ $BUILDSERVER:$WORKDIR/src-linux/ && \
-ssh $BUILDSERVER "cd /path/to/mts-device && export MACHINE=mtcdt && source oe-init-build-env build && bitbake $RECIPE -c compile -f" && \
-scp $BUILDSERVER:$WORKDIR/build-mlinux-sx1303/bin/station /tmp/station-test && \
-scp /tmp/station-test $GATEWAY:/tmp/station && \
-ssh $GATEWAY "sudo cp /tmp/station /opt/lora/station-sx1303 && sudo chmod +x /opt/lora/station-sx1303 && sudo /etc/init.d/lora-network-server restart"
+**Verifying Object Files Were Rebuilt:**
+
+**IMPORTANT:** `bitbake -c compile -f` does NOT always trigger actual recompilation even when source files have changed. The more reliable approach is to:
+
+1. Remove the specific object files you changed
+2. Source the `run.do_compile` script directly to invoke make
+
+```bash
+# More reliable rebuild method:
+cd $WORKDIR/build-mlinux-sx1303/s2core
+rm -f ral_lgw.o sx130xconf.o ../lib/libs2core.a ../bin/station
+source $MTS_DEVICE/build/tmp/work/mtcdt-mlinux-linux-gnueabi/$RECIPE/$VERSION/temp/run.do_compile
 ```
 
-Note: Replace paths, usernames, and server addresses with your actual values.
+Always verify timestamps:
+
+```bash
+# Check object file timestamps (should match current time after build)
+ls -la $WORKDIR/build-mlinux-sx1303/s2core/ral_lgw.o
+ls -la $WORKDIR/build-mlinux-sx1303/s2core/sx130xconf.o
+
+# If timestamps are old, force removal and rebuild:
+ssh $BUILDSERVER "rm -f $WORKDIR/build-mlinux-sx1303/s2core/*.o"
+ssh $BUILDSERVER "cd $MTS_DEVICE && source oe-init-build-env build && bitbake $RECIPE -c compile -f"
+
+# Verify new binary contains your changes
+strings $WORKDIR/build-mlinux-sx1303/bin/station | grep 'your_search_string'
+```
+
+**Automated Build Script:**
+
+Use the `build-deploy.sh` script in the repository root for automated build/deploy:
+
+```bash
+./build-deploy.sh              # Build and deploy
+./build-deploy.sh --build      # Build only
+./build-deploy.sh --deploy     # Deploy only (use last build)
+./build-deploy.sh --clean      # Clean objects before build
+./build-deploy.sh --restart    # Just restart station on gateway
+```
+
+The script automatically verifies object files were updated after compilation.
+
+**Example: MTCDT SX1303 Development**
+```bash
+# Configuration (adjust for your environment)
+BUILDSERVER="jreiss@buildslavemtcdt3dm2"
+GATEWAY_IP="10.10.200.140"
+GATEWAY_USER="admin"
+GATEWAY_PASS="admin2019!"
+MTS_DEVICE="/home/jreiss/mts-device"
+VERSION="2.0.6-27-r5"  # Check: ls $MTS_DEVICE/build/tmp/work/mtcdt-mlinux-linux-gnueabi/lora-basic-station-sx1303/
+WORKDIR="$MTS_DEVICE/build/tmp/work/mtcdt-mlinux-linux-gnueabi/lora-basic-station-sx1303/$VERSION/git"
+RECIPE="lora-basic-station-sx1303"
+
+# Step 1: Copy source files to build server
+scp src/*.c src/*.h src-linux/*.c src-linux/*.h $BUILDSERVER:$WORKDIR/src/
+
+# Step 2: Clean objects (optional - needed if headers changed)
+ssh $BUILDSERVER "rm -f $WORKDIR/build-mlinux-sx1303/s2core/*.o"
+
+# Step 3: Compile
+ssh $BUILDSERVER "cd $MTS_DEVICE && export MACHINE=mtcdt && source oe-init-build-env build && bitbake $RECIPE -c compile -f"
+
+# Step 4: Copy binary from build server
+scp $BUILDSERVER:$WORKDIR/build-mlinux-sx1303/bin/station /tmp/station-test
+
+# Step 5: Deploy to gateway
+sshpass -p '$GATEWAY_PASS' scp /tmp/station-test $GATEWAY_USER@$GATEWAY_IP:/tmp/station
+sshpass -p '$GATEWAY_PASS' ssh $GATEWAY_USER@$GATEWAY_IP "echo '$GATEWAY_PASS' | sudo -S cp /tmp/station /opt/lora/station-sx1303 && echo '$GATEWAY_PASS' | sudo -S chmod +x /opt/lora/station-sx1303 && echo '$GATEWAY_PASS' | sudo -S /etc/init.d/lora-network-server restart"
+```
+
+**One-liner version (copy-paste friendly):**
+```bash
+WORKDIR="/home/jreiss/mts-device/build/tmp/work/mtcdt-mlinux-linux-gnueabi/lora-basic-station-sx1303/2.0.6-27-r5/git" && \
+scp src/*.c src/*.h jreiss@buildslavemtcdt3dm2:$WORKDIR/src/ && \
+ssh jreiss@buildslavemtcdt3dm2 "rm -f $WORKDIR/build-mlinux-sx1303/s2core/*.o && cd /home/jreiss/mts-device && export MACHINE=mtcdt && source oe-init-build-env build && bitbake lora-basic-station-sx1303 -c compile -f" && \
+scp jreiss@buildslavemtcdt3dm2:$WORKDIR/build-mlinux-sx1303/bin/station /tmp/station-test && \
+sshpass -p 'admin2019!' scp /tmp/station-test admin@10.10.200.140:/tmp/station && \
+sshpass -p 'admin2019!' ssh admin@10.10.200.140 "echo 'admin2019!' | sudo -S cp /tmp/station /opt/lora/station-sx1303 && echo 'admin2019!' | sudo -S /etc/init.d/lora-network-server restart"
+```
+
+### Regenerating Protobuf Files
+
+If you modify `src/tc.proto`, you must regenerate `tc.pb.c` and `tc.pb.h`:
+
+```bash
+# Activate Python environment with protobuf support
+source pyenv/bin/activate
+
+# Prepare nanopb (first time only)
+cd deps/nanopb && bash prep.sh && cd ../..
+
+# Generate protobuf C files
+cd src
+python3 ../deps/nanopb/git-repo/generator/nanopb_generator.py -I . -D . tc.proto
+cd ..
+
+# Now copy both .proto and generated files to build server
+scp src/tc.proto src/tc.pb.c src/tc.pb.h $BUILDSERVER:$WORKDIR/src/
+```
+
+**Troubleshooting Protobuf Changes:**
+- If you add `optional` fields, ensure nanopb >= 0.4.5 (check with `grep PB_PROTO_HEADER_VERSION tc.pb.h`)
+- Proto3 `optional` generates `has_fieldname` boolean fields
+- Always regenerate and copy both `tc.pb.c` and `tc.pb.h` together
+- Clean object files after protobuf changes: `rm -rf $WORKDIR/build-mlinux-sx1303/s2core/*.o`
 
 ## Running Regression Tests
 
@@ -182,6 +279,45 @@ cd regr-tests
 # Run specific variant
 ./run-regression-tests --nohw --variant=testsim
 ```
+
+## Debugging Methodology: Tests First
+
+**Rule: Write tests to find bugs rather than searching through code.**
+
+When debugging issues, follow this approach:
+
+1. **Hypothesis from symptoms** - Form a hypothesis about what's failing
+2. **Write a minimal test** - Create a selftest that exercises that code path
+3. **Test proves/disproves** - If the test fails as expected, you've found the bug
+4. **Fix verified by test** - The same test validates the fix
+
+### Example: Writing a Bug-Finding Test
+
+```bash
+# 1. Create test file (see src/selftest_s2e.c for example)
+vi src/selftest_mytest.c
+
+# 2. Add to selftests.h
+extern void selftest_mytest();
+
+# 3. Add to selftests.c array
+selftest_mytest,
+
+# 4. Build and run
+make platform=linux variant=testsim
+cd regr-tests/test1-selftests
+STATION_SELFTESTS=1 ../../build-linux-testsim/bin/station -p 2>&1 | grep -i mytest
+```
+
+### Quick Selftest Run
+
+```bash
+cd regr-tests/test1-selftests
+STATION_SELFTESTS=1 ../../build-linux-testsim/bin/station -p
+```
+
+This runs all selftests including any new ones you've added. The output shows
+`ALL N SELFTESTS PASSED` on success.
 
 ### Test Timing
 

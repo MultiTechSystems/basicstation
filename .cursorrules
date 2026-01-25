@@ -1,0 +1,79 @@
+# Basic Station Development Rules
+
+## Debugging: Tests First, Not Code Archaeology
+
+**RULE: Write tests to find and prove bugs rather than searching through code.**
+
+When debugging issues:
+
+1. **Hypothesis from symptoms** - Form a hypothesis about what's failing based on observable behavior (error messages, logs, unexpected values)
+
+2. **Write a minimal test** that exercises that specific code path
+   - Add to `src/selftest_*.c` files
+   - Register in `src/selftests.h` and `src/selftests.c`
+   - Use `TCHECK()` macro for assertions
+
+3. **Test proves/disproves the hypothesis** - If the test fails as expected, you've found the bug. If it passes, refine the hypothesis.
+
+4. **Fix is verified by the test** - The same test that found the bug now validates the fix and prevents regression.
+
+### Why This Matters
+
+- **Faster** than grepping through multiple source files
+- **More reliable** - tests don't miss edge cases humans would
+- **Documents the bug** - test code explains what was broken
+- **Prevents regression** - test remains for future changes
+
+### Example Pattern
+
+```c
+// In src/selftest_example.c
+
+// Replicate the FIXED logic
+static bool test_function_fixed(ctx_t* ctx, int param) {
+    // Use the corrected function/logic
+    return correct_function(ctx, param);
+}
+
+// Replicate the BUGGY logic (before fix)
+static bool test_function_buggy(ctx_t* ctx, int param) {
+    // Use the broken function/logic
+    return broken_function(ctx, param);
+}
+
+static void test_the_bug(void) {
+    ctx_t ctx;
+    init_context(&ctx);
+    
+    // Show that fixed version works
+    TCHECK(test_function_fixed(&ctx, param) == expected);
+    
+    // Show that buggy version fails
+    TCHECK(test_function_buggy(&ctx, param) != expected);
+}
+```
+
+### Running Tests
+
+```bash
+# Build testsim variant
+make platform=linux variant=testsim
+
+# Run selftests
+cd regr-tests/test1-selftests
+STATION_SELFTESTS=1 ../../build-linux-testsim/bin/station -p
+```
+
+## Code Style
+
+- C code follows existing style in the codebase
+- Use `LOG()` macro for logging, not printf
+- Use `TCHECK()` for test assertions
+- Protobuf changes require regenerating `tc.pb.c` and `tc.pb.h`
+
+## Build Notes
+
+- `make platform=linux variant=testsim` for local testing
+- `bitbake lora-basic-station-sx1303 -c compile -f` for Yocto builds
+- Always verify object file timestamps after bitbake compile
+- See `docs/BUILD.md` for detailed build instructions
