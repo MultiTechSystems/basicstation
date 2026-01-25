@@ -55,11 +55,13 @@ message RadioMetadata {
   // Set to 0 if GPS not available
   int64 gpstime = 5;
   
-  // RSSI in dBm (typically negative, e.g., -50)
-  int32 rssi = 6;
+  // RSSI in dBm (typically -30 to -120, zigzag for efficient negative encoding)
+  sint32 rssi = 6;
   
-  // SNR in dB (can be negative for weak signals)
-  float snr = 7;
+  // SNR in centibels (cB = dB * 10, e.g., -7.5 dB = -75 cB)
+  // Range typically -200 to +150 cB (-20 to +15 dB)
+  // Using sint32 with zigzag for efficient encoding of small signed values
+  sint32 snr = 7;
   
   // Fine timestamp for geolocation (-1 if not available)
   // Using sint32 for efficient encoding of -1 sentinel value

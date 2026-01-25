@@ -3,7 +3,7 @@
 
 #ifndef PB_BASICSTATION_TC_PB_H_INCLUDED
 #define PB_BASICSTATION_TC_PB_H_INCLUDED
-#include "pb.h"
+#include <pb.h>
 
 #if PB_PROTO_HEADER_VERSION != 40
 #error Regenerate this file with the current version of nanopb generator.
@@ -49,10 +49,12 @@ typedef struct _basicstation_RadioMetadata {
     /* GPS time in microseconds since GPS epoch (if available)
  Set to 0 if GPS not available */
     int64_t gpstime;
-    /* RSSI in dBm (typically negative, e.g., -50) */
-    int32_t rssi;
-    /* SNR in dB (can be negative for weak signals) */
-    float snr;
+    /* RSSI in dBm (typically -30 to -120, zigzag for efficient negative encoding) */
+    int16_t rssi;
+    /* SNR in centibels (cB = dB * 10, e.g., -7.5 dB = -75 cB)
+ Range typically -200 to +150 cB (-20 to +15 dB)
+ Using sint32 with zigzag for efficient encoding of small signed values */
+    int16_t snr;
     /* Fine timestamp for geolocation (-1 if not available)
  Using sint32 for efficient encoding of -1 sentinel value */
     int32_t fts;
@@ -401,8 +403,8 @@ X(a, STATIC,   SINGULAR, UINT32,   freq,              2) \
 X(a, STATIC,   SINGULAR, INT64,    rctx,              3) \
 X(a, STATIC,   SINGULAR, INT64,    xtime,             4) \
 X(a, STATIC,   SINGULAR, INT64,    gpstime,           5) \
-X(a, STATIC,   SINGULAR, INT32,    rssi,              6) \
-X(a, STATIC,   SINGULAR, FLOAT,    snr,               7) \
+X(a, STATIC,   SINGULAR, SINT32,   rssi,              6) \
+X(a, STATIC,   SINGULAR, SINT32,   snr,               7) \
 X(a, STATIC,   SINGULAR, SINT32,   fts,               8) \
 X(a, STATIC,   SINGULAR, DOUBLE,   rxtime,            9)
 #define basicstation_RadioMetadata_CALLBACK NULL
@@ -566,16 +568,16 @@ extern const pb_msgdesc_t basicstation_TcMessage_msg;
 #define BASICSTATION_TC_PB_H_MAX_SIZE            basicstation_TcMessage_size
 #define basicstation_DownlinkMessage_size        372
 #define basicstation_DownlinkSchedule_size       4832
-#define basicstation_JoinRequest_size            122
-#define basicstation_ProprietaryFrame_size       346
-#define basicstation_RadioMetadata_size          76
+#define basicstation_JoinRequest_size            114
+#define basicstation_ProprietaryFrame_size       338
+#define basicstation_RadioMetadata_size          68
 #define basicstation_RemoteShell_size            1129
 #define basicstation_RunCommand_size             4386
 #define basicstation_ScheduleEntry_size          299
 #define basicstation_TcMessage_size              4837
 #define basicstation_TimeSync_size               31
 #define basicstation_TxConfirmation_size         62
-#define basicstation_UplinkDataFrame_size        662
+#define basicstation_UplinkDataFrame_size        654
 
 #ifdef __cplusplus
 } /* extern "C" */

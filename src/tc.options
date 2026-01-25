@@ -4,7 +4,9 @@
 # Max sizes for variable-length fields
 # These should match MAX_RXFRAME_LEN and similar constants
 
-# RadioMetadata - no variable fields, all fixed
+# RadioMetadata - optimize small integer fields to 16-bit
+basicstation.RadioMetadata.rssi             int_size:IS_16
+basicstation.RadioMetadata.snr              int_size:IS_16
 
 # UplinkDataFrame
 basicstation.UplinkDataFrame.fopts          max_size:16

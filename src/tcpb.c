@@ -67,7 +67,8 @@ static void fill_radio_metadata(basicstation_RadioMetadata* rm,
     rm->xtime = xtime;
     rm->gpstime = gpstime;
     rm->rssi = rssi;
-    rm->snr = snr;
+    // Convert SNR from dB to centibels (cB = dB * 10)
+    rm->snr = (s2_t)(snr * 10.0f);
     rm->fts = fts;
     rm->rxtime = rxtime;
 }
