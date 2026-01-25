@@ -514,7 +514,11 @@ static int setup_LBT (struct sx130xconf* sx130xconf, u4_t cca_region, lbt_config
 
 int sx130xconf_parse_setup (struct sx130xconf* sx130xconf, int slaveIdx,
                             str_t hwspec, char* json, int jsonlen) {
-    if( strcmp(hwspec, "sx1301/1") != 0 ) {
+    // Accept sx1301/1, sx1302/1, or sx1303/1 from LNS
+    // The actual chip type is detected by the HAL, hwspec is informational
+    if( strcmp(hwspec, "sx1301/1") != 0 &&
+        strcmp(hwspec, "sx1302/1") != 0 &&
+        strcmp(hwspec, "sx1303/1") != 0 ) {
         LOG(MOD_RAL|ERROR, "Unsupported hwspec: %s", hwspec);
         return 0;
     }

@@ -75,478 +75,361 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../pysys'))
 
 import tcutils as tu
+import math
+from collections import defaultdict
+import time
+
+# Import generated protobuf module
+import tc_pb2
 
 # ============================================================================
-# Protobuf support (manual encoding/decoding without protobuf library)
+# TDoA Geolocation Support
 # ============================================================================
 
-# Wire types
-WT_VARINT = 0
-WT_FIXED64 = 1
-WT_LENDELIM = 2
-WT_FIXED32 = 5
+# Speed of light in m/s
+SPEED_OF_LIGHT = 299792458.0
 
-# Message types (from tc.proto)
-MSG_UPDF = 1
-MSG_JREQ = 2
-MSG_PROPDF = 3
-MSG_DNTXED = 4
-MSG_TIMESYNC = 5
-MSG_DNMSG = 10
-MSG_DNSCHED = 11
-MSG_TIMESYNC_RESP = 12
-
-# TcMessage field numbers
-TCMSG_TYPE = 1
-TCMSG_UPDF = 2
-TCMSG_JREQ = 3
-TCMSG_PROPDF = 4
-TCMSG_DNTXED = 5
-TCMSG_TIMESYNC = 6
-TCMSG_DNMSG = 10
-
-# Field numbers for various messages
-UPDF_MHDR = 1
-UPDF_DEVADDR = 2
-UPDF_FCTRL = 3
-UPDF_FCNT = 4
-UPDF_FOPTS = 5
-UPDF_FPORT = 6
-UPDF_FRMPAYLOAD = 7
-UPDF_MIC = 8
-UPDF_UPINFO = 9
-UPDF_REFTIME = 10
-
-JREQ_MHDR = 1
-JREQ_JOINEUI = 2
-JREQ_DEVEUI = 3
-JREQ_DEVNONCE = 4
-JREQ_MIC = 5
-JREQ_UPINFO = 6
-JREQ_REFTIME = 7
-
-PROPDF_FRMPAYLOAD = 1
-PROPDF_UPINFO = 2
-PROPDF_REFTIME = 3
-
-DNTXED_DIID = 1
-DNTXED_DEVEUI = 2
-DNTXED_RCTX = 3
-DNTXED_XTIME = 4
-DNTXED_TXTIME = 5
-DNTXED_GPSTIME = 6
-
-TSYNC_TXTIME = 1
-TSYNC_GPSTIME = 2
-TSYNC_XTIME = 3
-
-RM_DR = 1
-RM_FREQ = 2
-RM_RCTX = 3
-RM_XTIME = 4
-RM_GPSTIME = 5
-RM_RSSI = 6
-RM_SNR = 7
-RM_FTS = 8
-RM_RXTIME = 9
-
-DNMSG_DEVEUI = 1
-DNMSG_DC = 2
-DNMSG_DIID = 3
-DNMSG_PDU = 4
-DNMSG_RXDELAY = 5
-DNMSG_RX1DR = 6
-DNMSG_RX1FREQ = 7
-DNMSG_RX2DR = 8
-DNMSG_RX2FREQ = 9
-DNMSG_PRIORITY = 10
-DNMSG_XTIME = 11
-DNMSG_RCTX = 12
-DNMSG_GPSTIME = 13
-DNMSG_DR = 14
-DNMSG_FREQ = 15
-DNMSG_MUXTIME = 16
-
-
-class ProtobufDecoder:
-    """Decode protobuf messages from station."""
+class TDoALocator:
+    """
+    TDoA-based device geolocation using multiple gateway receptions.
     
-    def __init__(self, data: bytes):
-        self.data = data
-        self.pos = 0
-    
-    def read_varint(self) -> int:
-        result = 0
-        shift = 0
-        while self.pos < len(self.data):
-            b = self.data[self.pos]
-            self.pos += 1
-            result |= (b & 0x7F) << shift
-            if (b & 0x80) == 0:
-                return result
-            shift += 7
-        raise ValueError("Truncated varint")
-    
-    def read_svarint(self) -> int:
-        """Read signed varint (zigzag encoded)."""
-        n = self.read_varint()
-        return (n >> 1) ^ -(n & 1)
-    
-    def read_fixed32(self) -> int:
-        if self.pos + 4 > len(self.data):
-            raise ValueError("Truncated fixed32")
-        val = struct.unpack('<I', self.data[self.pos:self.pos+4])[0]
-        self.pos += 4
-        return val
-    
-    def read_sfixed32(self) -> int:
-        if self.pos + 4 > len(self.data):
-            raise ValueError("Truncated sfixed32")
-        val = struct.unpack('<i', self.data[self.pos:self.pos+4])[0]
-        self.pos += 4
-        return val
-    
-    def read_fixed64(self) -> int:
-        if self.pos + 8 > len(self.data):
-            raise ValueError("Truncated fixed64")
-        val = struct.unpack('<Q', self.data[self.pos:self.pos+8])[0]
-        self.pos += 8
-        return val
-    
-    def read_double(self) -> float:
-        if self.pos + 8 > len(self.data):
-            raise ValueError("Truncated double")
-        val = struct.unpack('<d', self.data[self.pos:self.pos+8])[0]
-        self.pos += 8
-        return val
-    
-    def read_float(self) -> float:
-        if self.pos + 4 > len(self.data):
-            raise ValueError("Truncated float")
-        val = struct.unpack('<f', self.data[self.pos:self.pos+4])[0]
-        self.pos += 4
-        return val
-    
-    def read_bytes(self) -> bytes:
-        length = self.read_varint()
-        if self.pos + length > len(self.data):
-            raise ValueError("Truncated bytes")
-        val = self.data[self.pos:self.pos+length]
-        self.pos += length
-        return val
-    
-    def skip(self, wiretype: int):
-        if wiretype == WT_VARINT:
-            self.read_varint()
-        elif wiretype == WT_FIXED64:
-            self.pos += 8
-        elif wiretype == WT_LENDELIM:
-            length = self.read_varint()
-            self.pos += length
-        elif wiretype == WT_FIXED32:
-            self.pos += 4
-        else:
-            raise ValueError(f"Unknown wire type: {wiretype}")
-    
-    def decode_radio_metadata(self) -> dict:
-        """Decode RadioMetadata submessage."""
-        result = {}
-        submsg_data = self.read_bytes()
-        sub = ProtobufDecoder(submsg_data)
-        while sub.pos < len(submsg_data):
-            tag = sub.read_varint()
-            field = tag >> 3
-            wt = tag & 7
-            if field == RM_DR:
-                result['DR'] = sub.read_varint()
-            elif field == RM_FREQ:
-                result['Freq'] = sub.read_varint()
-            elif field == RM_RCTX:
-                result['rctx'] = sub.read_svarint()
-            elif field == RM_XTIME:
-                result['xtime'] = sub.read_svarint()
-            elif field == RM_GPSTIME:
-                result['gpstime'] = sub.read_svarint()
-            elif field == RM_RSSI:
-                result['rssi'] = sub.read_svarint()
-            elif field == RM_SNR:
-                result['snr'] = sub.read_float()
-            elif field == RM_FTS:
-                # fts is sint32 - uses zigzag encoding
-                result['fts'] = sub.read_svarint()
-            elif field == RM_RXTIME:
-                result['rxtime'] = sub.read_double()
-            else:
-                sub.skip(wt)
-        return result
-    
-    def decode_updf(self) -> dict:
-        """Decode UplinkDataFrame message."""
-        result = {'msgtype': 'updf'}
-        submsg_data = self.read_bytes()
-        sub = ProtobufDecoder(submsg_data)
-        while sub.pos < len(submsg_data):
-            tag = sub.read_varint()
-            field = tag >> 3
-            wt = tag & 7
-            if field == UPDF_MHDR:
-                result['MHdr'] = sub.read_varint()
-            elif field == UPDF_DEVADDR:
-                result['DevAddr'] = sub.read_sfixed32()
-            elif field == UPDF_FCTRL:
-                result['FCtrl'] = sub.read_varint()
-            elif field == UPDF_FCNT:
-                result['FCnt'] = sub.read_varint()
-            elif field == UPDF_FOPTS:
-                result['FOpts'] = sub.read_bytes().hex()
-            elif field == UPDF_FPORT:
-                result['FPort'] = sub.read_svarint()
-            elif field == UPDF_FRMPAYLOAD:
-                result['FRMPayload'] = sub.read_bytes().hex()
-            elif field == UPDF_MIC:
-                result['MIC'] = sub.read_sfixed32()
-            elif field == UPDF_UPINFO:
-                # Need to parse submessage
-                sub.pos -= 1  # Back up to re-read tag for read_bytes
-                while sub.data[sub.pos] & 0x80:
-                    sub.pos -= 1
-                sub.pos += 1
-                result['upinfo'] = sub.decode_radio_metadata()
-            elif field == UPDF_REFTIME:
-                result['RefTime'] = sub.read_double()
-            else:
-                sub.skip(wt)
-        return result
-    
-    def decode_jreq(self) -> dict:
-        """Decode JoinRequest message."""
-        result = {'msgtype': 'jreq'}
-        submsg_data = self.read_bytes()
-        sub = ProtobufDecoder(submsg_data)
-        while sub.pos < len(submsg_data):
-            tag = sub.read_varint()
-            field = tag >> 3
-            wt = tag & 7
-            if field == JREQ_MHDR:
-                result['MHdr'] = sub.read_varint()
-            elif field == JREQ_JOINEUI:
-                result['JoinEui'] = f"{sub.read_fixed64():016X}"
-            elif field == JREQ_DEVEUI:
-                result['DevEui'] = f"{sub.read_fixed64():016X}"
-            elif field == JREQ_DEVNONCE:
-                result['DevNonce'] = sub.read_varint()
-            elif field == JREQ_MIC:
-                result['MIC'] = sub.read_sfixed32()
-            elif field == JREQ_UPINFO:
-                sub.pos -= 1
-                while sub.data[sub.pos] & 0x80:
-                    sub.pos -= 1
-                sub.pos += 1
-                result['upinfo'] = sub.decode_radio_metadata()
-            elif field == JREQ_REFTIME:
-                result['RefTime'] = sub.read_double()
-            else:
-                sub.skip(wt)
-        return result
-    
-    def decode_propdf(self) -> dict:
-        """Decode ProprietaryFrame message."""
-        result = {'msgtype': 'propdf'}
-        submsg_data = self.read_bytes()
-        sub = ProtobufDecoder(submsg_data)
-        while sub.pos < len(submsg_data):
-            tag = sub.read_varint()
-            field = tag >> 3
-            wt = tag & 7
-            if field == PROPDF_FRMPAYLOAD:
-                result['FRMPayload'] = sub.read_bytes().hex()
-            elif field == PROPDF_UPINFO:
-                sub.pos -= 1
-                while sub.data[sub.pos] & 0x80:
-                    sub.pos -= 1
-                sub.pos += 1
-                result['upinfo'] = sub.decode_radio_metadata()
-            elif field == PROPDF_REFTIME:
-                result['RefTime'] = sub.read_double()
-            else:
-                sub.skip(wt)
-        return result
-    
-    def decode_dntxed(self) -> dict:
-        """Decode TxConfirmation message."""
-        result = {'msgtype': 'dntxed'}
-        submsg_data = self.read_bytes()
-        sub = ProtobufDecoder(submsg_data)
-        while sub.pos < len(submsg_data):
-            tag = sub.read_varint()
-            field = tag >> 3
-            wt = tag & 7
-            if field == DNTXED_DIID:
-                result['diid'] = sub.read_svarint()
-                result['seqno'] = result['diid']  # Backward compat
-            elif field == DNTXED_DEVEUI:
-                result['DevEui'] = f"{sub.read_fixed64():016X}"
-            elif field == DNTXED_RCTX:
-                result['rctx'] = sub.read_svarint()
-            elif field == DNTXED_XTIME:
-                result['xtime'] = sub.read_svarint()
-            elif field == DNTXED_TXTIME:
-                result['txtime'] = sub.read_double()
-            elif field == DNTXED_GPSTIME:
-                result['gpstime'] = sub.read_svarint()
-            else:
-                sub.skip(wt)
-        return result
-    
-    def decode_timesync(self) -> dict:
-        """Decode TimeSync message."""
-        result = {'msgtype': 'timesync'}
-        submsg_data = self.read_bytes()
-        sub = ProtobufDecoder(submsg_data)
-        while sub.pos < len(submsg_data):
-            tag = sub.read_varint()
-            field = tag >> 3
-            wt = tag & 7
-            if field == TSYNC_TXTIME:
-                result['txtime'] = sub.read_double()
-            elif field == TSYNC_GPSTIME:
-                result['gpstime'] = sub.read_svarint()
-            elif field == TSYNC_XTIME:
-                result['xtime'] = sub.read_svarint()
-            else:
-                sub.skip(wt)
-        return result
-    
-    def decode(self) -> dict:
-        """Decode a TcMessage."""
-        msgtype = None
-        payload_field = None
-        
-        while self.pos < len(self.data):
-            tag = self.read_varint()
-            field = tag >> 3
-            wt = tag & 7
-            
-            if field == TCMSG_TYPE:
-                msgtype = self.read_varint()
-            elif wt == WT_LENDELIM:
-                payload_field = field
-                break
-            else:
-                self.skip(wt)
-        
-        if msgtype is None or payload_field is None:
-            raise ValueError("Invalid TcMessage: missing type or payload")
-        
-        if msgtype == MSG_UPDF:
-            return self.decode_updf()
-        elif msgtype == MSG_JREQ:
-            return self.decode_jreq()
-        elif msgtype == MSG_PROPDF:
-            return self.decode_propdf()
-        elif msgtype == MSG_DNTXED:
-            return self.decode_dntxed()
-        elif msgtype == MSG_TIMESYNC:
-            return self.decode_timesync()
-        else:
-            raise ValueError(f"Unknown message type: {msgtype}")
-
-
-class ProtobufEncoder:
-    """Encode protobuf messages to station."""
+    When the same uplink is received by 3+ gateways, we can use the time
+    differences of arrival to estimate the device location.
+    """
     
     def __init__(self):
-        self.data = bytearray()
-    
-    def write_varint(self, value: int):
-        while value >= 0x80:
-            self.data.append((value & 0x7F) | 0x80)
-            value >>= 7
-        self.data.append(value)
-    
-    def write_svarint(self, value: int):
-        """Write signed varint (zigzag encoded)."""
-        if value >= 0:
-            self.write_varint(value << 1)
-        else:
-            self.write_varint(((-value) << 1) - 1)
-    
-    def write_fixed64(self, value: int):
-        self.data.extend(struct.pack('<Q', value))
-    
-    def write_double(self, value: float):
-        self.data.extend(struct.pack('<d', value))
-    
-    def write_bytes(self, value: bytes):
-        self.write_varint(len(value))
-        self.data.extend(value)
-    
-    def write_tag(self, field: int, wiretype: int):
-        self.write_varint((field << 3) | wiretype)
-    
-    def encode_timesync_response(self, gpstime: int, txtime: float, xtime: int) -> bytes:
-        """Encode a timesync response message."""
-        # Build the TimeSync submessage
-        submsg = ProtobufEncoder()
-        submsg.write_tag(TSYNC_GPSTIME, WT_VARINT)
-        submsg.write_svarint(gpstime)
-        # Include original txtime for RTT calculation
-        submsg.write_tag(TSYNC_TXTIME, WT_FIXED64)
-        submsg.write_double(txtime)
-        # Echo back xtime for ts_setTimesyncLns
-        if xtime:
-            submsg.write_tag(TSYNC_XTIME, WT_VARINT)
-            submsg.write_svarint(xtime)
+        # Gateway locations: gateway_id -> (lat, lon, alt)
+        self.gateways = {}
+        # Pending uplinks: (DevAddr, FCnt, pdu_hash) -> [(gateway_id, gpstime, fts, rssi, snr, freq, recv_time)]
+        self.pending = defaultdict(list)
+        # Aggregation window in seconds (wait for all gateways to report)
+        self.window = 1.0
         
-        # Build the TcMessage wrapper
-        self.write_tag(TCMSG_TYPE, WT_VARINT)
-        self.write_varint(MSG_TIMESYNC_RESP)
-        self.write_tag(TCMSG_TIMESYNC, WT_LENDELIM)
-        self.write_bytes(bytes(submsg.data))
+    def add_gateway(self, gateway_id: str, lat: float, lon: float, alt: float = 0.0):
+        """Register a gateway location."""
+        self.gateways[gateway_id] = (lat, lon, alt)
+        logger.info('TDoA: Registered gateway %s at (%.6f, %.6f, %.1fm)', 
+                   gateway_id, lat, lon, alt)
         
-        return bytes(self.data)
+    def add_reception(self, gateway_id: str, dev_addr: int, fcnt: int, pdu: str,
+                     gpstime: int, fts: int, rssi: int, snr: float, freq: int):
+        """
+        Add a reception of an uplink packet.
+        
+        Args:
+            gateway_id: Identifier for the gateway (e.g., IP address)
+            dev_addr: Device address from the uplink
+            fcnt: Frame counter from the uplink
+            pdu: Raw PDU hex string (for matching duplicates)
+            gpstime: GPS time in microseconds (0 if not available)
+            fts: Fine timestamp in nanoseconds (-1 if not available)
+            rssi: RSSI in dBm
+            snr: SNR in dB
+            freq: Frequency in Hz
+        """
+        # Use PDU hash to match exact same packet across gateways
+        pdu_hash = hash(pdu) if pdu else 0
+        key = (dev_addr, fcnt, pdu_hash)
+        now = time.time()
+        
+        # Clean up old entries
+        old_keys = [k for k, rxs in self.pending.items() 
+                   if rxs and now - rxs[0][6] > self.window * 3]
+        for k in old_keys:
+            del self.pending[k]
+        
+        # Check if we already have this gateway for this packet
+        for rx in self.pending[key]:
+            if rx[0] == gateway_id:
+                return  # Duplicate from same gateway
+        
+        # Add reception
+        self.pending[key].append((gateway_id, gpstime, fts, rssi, snr, freq, now))
+        
+        # Check if we can do TDoA
+        receptions = self.pending[key]
+        if len(receptions) >= 3:
+            first_time = receptions[0][6]
+            if now - first_time >= self.window:
+                self._do_tdoa(dev_addr, fcnt, receptions)
+                del self.pending[key]
     
-    def encode_dnmsg(self, deveui: int, dclass: int, diid: int, pdu: bytes,
-                     rxdelay: int, rx1dr: int, rx1freq: int,
-                     rx2dr: int, rx2freq: int, priority: int,
-                     xtime: int, rctx: int, muxtime: float) -> bytes:
-        """Encode a downlink message."""
-        # Build the DownlinkMessage submessage
-        submsg = ProtobufEncoder()
-        submsg.write_tag(DNMSG_DEVEUI, WT_FIXED64)
-        submsg.write_fixed64(deveui)
-        submsg.write_tag(DNMSG_DC, WT_VARINT)
-        submsg.write_varint(dclass)
-        submsg.write_tag(DNMSG_DIID, WT_VARINT)
-        submsg.write_svarint(diid)
-        submsg.write_tag(DNMSG_PDU, WT_LENDELIM)
-        submsg.write_bytes(pdu)
-        submsg.write_tag(DNMSG_RXDELAY, WT_VARINT)
-        submsg.write_varint(rxdelay)
-        submsg.write_tag(DNMSG_RX1DR, WT_VARINT)
-        submsg.write_varint(rx1dr)
-        submsg.write_tag(DNMSG_RX1FREQ, WT_VARINT)
-        submsg.write_varint(rx1freq)
-        submsg.write_tag(DNMSG_RX2DR, WT_VARINT)
-        submsg.write_varint(rx2dr)
-        submsg.write_tag(DNMSG_RX2FREQ, WT_VARINT)
-        submsg.write_varint(rx2freq)
-        submsg.write_tag(DNMSG_PRIORITY, WT_VARINT)
-        submsg.write_varint(priority)
-        submsg.write_tag(DNMSG_XTIME, WT_VARINT)
-        submsg.write_svarint(xtime)
-        submsg.write_tag(DNMSG_RCTX, WT_VARINT)
-        submsg.write_svarint(rctx)
-        submsg.write_tag(DNMSG_MUXTIME, WT_FIXED64)
-        submsg.write_double(muxtime)
+    def _do_tdoa(self, dev_addr: int, fcnt: int, receptions: list):
+        """Perform TDoA calculation with 3+ gateway receptions."""
+        # Filter to gateways we have locations for
+        valid = [(gw_id, gps, fts, rssi, snr, freq) 
+                for gw_id, gps, fts, rssi, snr, freq, _ in receptions
+                if gw_id in self.gateways]
         
-        # Build the TcMessage wrapper
-        self.write_tag(TCMSG_TYPE, WT_VARINT)
-        self.write_varint(MSG_DNMSG)
-        self.write_tag(TCMSG_DNMSG, WT_LENDELIM)
-        self.write_bytes(bytes(submsg.data))
+        if len(valid) < 3:
+            logger.info('TDoA: DevAddr=%08X FCnt=%d - only %d gateways with known locations',
+                       dev_addr, fcnt, len(valid))
+            return
         
-        return bytes(self.data)
+        # Sort by arrival time (prefer fts, fall back to gpstime)
+        def arrival_key(rx):
+            gw_id, gps, fts, rssi, snr, freq = rx
+            if fts >= 0 and gps > 0:
+                return gps * 1000 + fts  # nanoseconds
+            elif gps > 0:
+                return gps * 1000
+            return float('inf')
+        
+        valid.sort(key=arrival_key)
+        
+        # Reference is first arrival
+        ref = valid[0]
+        ref_gw, ref_gps, ref_fts, ref_rssi, ref_snr, ref_freq = ref
+        ref_lat, ref_lon, ref_alt = self.gateways[ref_gw]
+        
+        logger.info('TDoA: DevAddr=%08X FCnt=%d - %d gateways', dev_addr, fcnt, len(valid))
+        
+        # Calculate time differences
+        tdoas = []
+        for i, (gw_id, gps, fts, rssi, snr, freq) in enumerate(valid):
+            lat, lon, alt = self.gateways[gw_id]
+            
+            # Calculate TDoA relative to reference
+            if i == 0:
+                tdoa_ns = 0
+            else:
+                ref_time = (ref_gps * 1000 + ref_fts) if ref_fts >= 0 else ref_gps * 1000
+                this_time = (gps * 1000 + fts) if fts >= 0 else gps * 1000
+                tdoa_ns = this_time - ref_time
+            
+            dist_diff_m = (tdoa_ns * 1e-9) * SPEED_OF_LIGHT
+            tdoas.append((gw_id, tdoa_ns, dist_diff_m, rssi, snr))
+            
+            fts_str = f'{fts}ns' if fts >= 0 else 'N/A'
+            logger.info('  GW %s: RSSI=%d SNR=%.1f TDoA=%+dns (%.1fm) fts=%s',
+                       gw_id, rssi, snr, tdoa_ns, dist_diff_m, fts_str)
+        
+        # Simple RSSI-weighted centroid estimate
+        # (A real solver would use hyperbolic multilateration)
+        total_w = 0.0
+        est_lat = 0.0
+        est_lon = 0.0
+        
+        for gw_id, tdoa_ns, dist_diff, rssi, snr in tdoas:
+            lat, lon, alt = self.gateways[gw_id]
+            # Weight: stronger signal = likely closer
+            w = 10 ** ((rssi + 120) / 20.0)  # Normalize around -120 dBm
+            est_lat += lat * w
+            est_lon += lon * w
+            total_w += w
+        
+        if total_w > 0:
+            est_lat /= total_w
+            est_lon /= total_w
+            logger.info('  => Estimated location: (%.6f, %.6f)', est_lat, est_lon)
+            
+            # Calculate distances from estimate to each gateway
+            for gw_id, _, _, rssi, _ in tdoas:
+                gw_lat, gw_lon, _ = self.gateways[gw_id]
+                dist_km = self._haversine(est_lat, est_lon, gw_lat, gw_lon)
+                logger.info('     Distance to %s: %.2f km', gw_id, dist_km)
+    
+    def _haversine(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """Calculate great-circle distance between two points in km."""
+        R = 6371.0  # Earth radius in km
+        
+        lat1_r, lon1_r = math.radians(lat1), math.radians(lon1)
+        lat2_r, lon2_r = math.radians(lat2), math.radians(lon2)
+        
+        dlat = lat2_r - lat1_r
+        dlon = lon2_r - lon1_r
+        
+        a = math.sin(dlat/2)**2 + math.cos(lat1_r) * math.cos(lat2_r) * math.sin(dlon/2)**2
+        c = 2 * math.asin(math.sqrt(a))
+        
+        return R * c
+
+# Global TDoA locator instance
+g_tdoa_locator = TDoALocator()
+
+# ============================================================================
+# Protobuf Helpers using generated tc_pb2 module
+# ============================================================================
+
+def decode_protobuf_message(data: bytes) -> dict:
+    """
+    Decode a protobuf TcMessage from the station.
+    
+    Returns a dict with 'msgtype' and message-specific fields.
+    Uses the generated tc_pb2 module for correct wire format handling.
+    """
+    msg = tc_pb2.TcMessage()
+    msg.ParseFromString(data)
+    
+    msgtype = msg.msg_type
+    result = {}
+    
+    if msgtype == tc_pb2.MSG_UPDF:
+        updf = msg.updf
+        result = {'msgtype': 'updf'}
+        
+        # Check if this is pdu_only mode by looking at whether parsed fields have real values
+        # In pdu_only mode: only pdu is set, all parsed fields are default (0)
+        # In normal mode: parsed fields have values, pdu may or may not be present
+        has_parsed_values = (updf.mhdr != 0 or updf.dev_addr != 0 or 
+                            updf.fcnt != 0 or updf.mic != 0)
+        
+        # Include pdu if present
+        if updf.pdu:
+            result['pdu'] = updf.pdu.hex()
+        
+        # Only include parsed fields if they have actual values (not pdu_only mode)
+        if has_parsed_values:
+            result['MHdr'] = updf.mhdr
+            result['DevAddr'] = updf.dev_addr
+            result['FCtrl'] = updf.fctrl
+            result['FCnt'] = updf.fcnt
+            result['FPort'] = updf.fport
+            result['MIC'] = updf.mic
+            if updf.fopts:
+                result['FOpts'] = updf.fopts.hex()
+            if updf.frm_payload:
+                result['FRMPayload'] = updf.frm_payload.hex()
+        
+        if updf.ref_time:
+            result['RefTime'] = updf.ref_time
+        if updf.HasField('upinfo'):
+            result['upinfo'] = _decode_radio_metadata(updf.upinfo)
+    
+    elif msgtype == tc_pb2.MSG_JREQ:
+        jreq = msg.jreq
+        result = {
+            'msgtype': 'jreq',
+            'MHdr': jreq.mhdr,
+            'JoinEui': f"{jreq.join_eui:016X}",
+            'DevEui': f"{jreq.dev_eui:016X}",
+            'DevNonce': jreq.dev_nonce,
+            'MIC': jreq.mic,
+            'RefTime': jreq.ref_time,
+        }
+        if jreq.HasField('upinfo'):
+            result['upinfo'] = _decode_radio_metadata(jreq.upinfo)
+    
+    elif msgtype == tc_pb2.MSG_PROPDF:
+        propdf = msg.propdf
+        result = {
+            'msgtype': 'propdf',
+            'FRMPayload': propdf.frm_payload.hex() if propdf.frm_payload else '',
+            'RefTime': propdf.ref_time,
+        }
+        if propdf.HasField('upinfo'):
+            result['upinfo'] = _decode_radio_metadata(propdf.upinfo)
+    
+    elif msgtype == tc_pb2.MSG_DNTXED:
+        dntxed = msg.dntxed
+        result = {
+            'msgtype': 'dntxed',
+            'diid': dntxed.diid,
+            'seqno': dntxed.diid,  # backward compat
+            'DevEui': f"{dntxed.dev_eui:016X}",
+            'rctx': dntxed.rctx,
+            'xtime': dntxed.xtime,
+            'txtime': dntxed.txtime,
+            'gpstime': dntxed.gpstime,
+        }
+    
+    elif msgtype == tc_pb2.MSG_TIMESYNC:
+        ts = msg.timesync
+        result = {
+            'msgtype': 'timesync',
+            'txtime': ts.txtime,
+            'gpstime': ts.gpstime,
+            'xtime': ts.xtime,
+        }
+    
+    else:
+        raise ValueError(f"Unknown message type: {msgtype}")
+    
+    return result
+
+
+def _decode_radio_metadata(rm) -> dict:
+    """Convert RadioMetadata protobuf to dict."""
+    return {
+        'DR': rm.dr,
+        'Freq': rm.freq,
+        'rctx': rm.rctx,
+        'xtime': rm.xtime,
+        'gpstime': rm.gpstime,
+        'rssi': rm.rssi,
+        'snr': rm.snr / 10.0,  # Convert centibels to dB
+        'fts': rm.fts,
+        'rxtime': rm.rxtime,
+    }
+
+
+def encode_timesync_response(gpstime: int, txtime: float, xtime: int = 0) -> bytes:
+    """
+    Encode a timesync response message.
+    
+    Args:
+        gpstime: GPS time in microseconds since GPS epoch
+        txtime: Original txtime from station (for RTT calculation)
+        xtime: Optional xtime for LNS-initiated GPS transfer
+    
+    Returns:
+        Serialized protobuf bytes
+    """
+    msg = tc_pb2.TcMessage()
+    msg.msg_type = tc_pb2.MSG_TIMESYNC_RESP
+    msg.timesync.gpstime = gpstime
+    msg.timesync.txtime = txtime
+    if xtime:
+        msg.timesync.xtime = xtime
+    return msg.SerializeToString()
+
+
+def encode_downlink_message(deveui: int, dclass: int, diid: int, pdu: bytes,
+                            rxdelay: int, rx1dr: int, rx1freq: int,
+                            rx2dr: int, rx2freq: int, priority: int,
+                            xtime: int, rctx: int, muxtime: float,
+                            gpstime: int = 0) -> bytes:
+    """
+    Encode a downlink message.
+    
+    Args:
+        deveui: Device EUI (64-bit)
+        dclass: Device class (0=A, 1=B, 2=C)
+        diid: Downlink ID for correlation
+        pdu: PHYPayload bytes to transmit
+        rxdelay: RX window delay in seconds
+        rx1dr, rx1freq: RX1 data rate and frequency
+        rx2dr, rx2freq: RX2 data rate and frequency
+        priority: Transmission priority
+        xtime: Timing reference from uplink
+        rctx: Radio context from uplink
+        muxtime: MuxTime for RTT monitoring
+        gpstime: GPS time for Class B/C (optional)
+    
+    Returns:
+        Serialized protobuf bytes
+    """
+    msg = tc_pb2.TcMessage()
+    msg.msg_type = tc_pb2.MSG_DNMSG
+    
+    dnmsg = msg.dnmsg
+    dnmsg.dev_eui = deveui
+    dnmsg.dc = dclass
+    dnmsg.diid = diid
+    dnmsg.pdu = pdu
+    dnmsg.rx_delay = rxdelay
+    dnmsg.rx1_dr = rx1dr
+    dnmsg.rx1_freq = rx1freq
+    dnmsg.rx2_dr = rx2dr
+    dnmsg.rx2_freq = rx2freq
+    dnmsg.priority = priority
+    dnmsg.xtime = xtime
+    dnmsg.rctx = rctx
+    dnmsg.mux_time = muxtime
+    if gpstime:
+        dnmsg.gpstime = gpstime
+    
+    return msg.SerializeToString()
 
 
 # Region-specific LBT channel configurations
@@ -654,22 +537,56 @@ class TestMuxs(tu.Muxs):
             await ws.close(4000)
             return
         self.ws = ws
+        # Reset per-connection state for new station
+        self.station_version = ''
+        self.station_features = []
+        self.protobuf_enabled = False
         # Don't send router_config here - wait for handle_version
         await self.handle_connection(ws)
     
     def get_router_config(self):
-        # Select base region config based on region and asym_dr option
+        # Detect chipset from station version string (e.g., "2.0.6(mlinux/sx1303)")
+        station_str = getattr(self, 'station_version', '') or ''
+        is_sx1303 = 'sx1303' in station_str.lower()
+        is_sx1302 = 'sx1302' in station_str.lower() and not is_sx1303
+        
+        # Select base region config based on region, asym_dr, and chipset
         if g_args.asym_dr:
-            # RP2 1.0.5 asymmetric datarate configs (with SF5/SF6 support)
-            region_configs = {
-                'EU868': tu.router_config_EU868_6ch_RP2_sf5sf6,
-                'US915': tu.router_config_US902_8ch_RP2_sf5sf6,
-                'AU915': tu.router_config_AU915_8ch_RP2_sf5sf6,
-                'AS923': tu.router_config_AS923_8ch_RP2_sf5sf6,
-                'KR920': tu.router_config_KR920_3ch_RP2_sf5sf6,
-                'IN865': tu.router_config_IN865_3ch_RP2_sf5sf6,
-            }
-            logger.info('Using RP2 1.0.5 asymmetric DR config')
+            if is_sx1303:
+                # SX1303 configs with sx1302_conf and hwspec sx1303/1
+                region_configs = {
+                    'EU868': tu.router_config_EU868_6ch_RP2_sx1303,
+                    'US915': tu.router_config_US902_8ch_RP2_sx1303,
+                    'AU915': tu.router_config_AU915_8ch_RP2_sx1303,
+                    'AS923': tu.router_config_AS923_8ch_RP2_sx1303,
+                    'KR920': tu.router_config_KR920_3ch_RP2_sx1303,
+                    'IN865': tu.router_config_IN865_3ch_RP2_sx1303,
+                }
+                logger.info('Using RP2 1.0.5 config for SX1303')
+            elif is_sx1302:
+                # SX1302 configs with sx1302_conf and hwspec sx1302/1
+                region_configs = {
+                    'EU868': tu.router_config_EU868_6ch_RP2_sx1302,
+                    'US915': tu.router_config_US902_8ch_RP2_sx1302,
+                    'AU915': tu.router_config_AU915_8ch_RP2_sx1302,
+                    'AS923': tu.router_config_AS923_8ch_RP2_sx1302,
+                    'KR920': tu.router_config_KR920_3ch_RP2_sx1302,
+                    'IN865': tu.router_config_IN865_3ch_RP2_sx1302,
+                }
+                logger.info('Using RP2 1.0.5 config for SX1302')
+            else:
+                # Chipset not detected - default to SX1302 config since asym-dr implies RP2 1.0.5
+                # which is typically used with SX1302/SX1303 concentrators
+                region_configs = {
+                    'EU868': tu.router_config_EU868_6ch_RP2_sx1302,
+                    'US915': tu.router_config_US902_8ch_RP2_sx1302,
+                    'AU915': tu.router_config_AU915_8ch_RP2_sx1302,
+                    'AS923': tu.router_config_AS923_8ch_RP2_sx1302,
+                    'KR920': tu.router_config_KR920_3ch_RP2_sx1302,
+                    'IN865': tu.router_config_IN865_3ch_RP2_sx1302,
+                }
+                logger.info('Using RP2 1.0.5 config (chipset not detected, defaulting to SX1302)')
+                logger.debug('Station version string: %r', station_str)
         else:
             # Standard configs (sx1301 compatible, 8-channel where available)
             region_configs = {
@@ -681,21 +598,25 @@ class TestMuxs(tu.Muxs):
                 'IN865': tu.router_config_EU863_6ch,  # Fallback to EU config structure
             }
         
-        config = dict(region_configs.get(g_args.region, tu.router_config_US902_8ch))
+        import copy
+        config = copy.deepcopy(region_configs.get(g_args.region, tu.router_config_US902_8ch))
         
         # Apply feature options
         if g_args.pdu_only:
             config['pdu_only'] = True
             logger.info('PDU-only mode ENABLED')
         
-        # Protobuf: only enable if station supports it and user requested it
+        # Protobuf: only enable if user requested it AND station supports it
         if g_args.protobuf and 'protobuf' in self.station_features:
             config['protocol_format'] = 'protobuf'
             self.protobuf_enabled = True
             logger.info('Protobuf binary protocol ENABLED')
-        elif g_args.protobuf:
-            logger.warning('Protobuf requested but station does not advertise protobuf feature')
+        else:
+            # Explicitly set JSON to override any previous protobuf setting
+            config['protocol_format'] = 'json'
             self.protobuf_enabled = False
+            if g_args.protobuf:
+                logger.warning('Protobuf requested but station does not support it - using JSON')
         
         # Duty cycle: explicit on/off sends the field, None means don't send (use station default)
         if g_args.duty_cycle is not None:
@@ -789,12 +710,24 @@ class TestMuxs(tu.Muxs):
         return config
     
     async def handle_version(self, ws, msg):
+        # Get client IP from websocket (used as gateway ID for TDoA)
+        try:
+            peername = ws.remote_address
+            self.gateway_id = peername[0] if peername else "unknown"
+            client_ip = f"{peername[0]}:{peername[1]}" if peername else "unknown"
+        except:
+            self.gateway_id = "unknown"
+            client_ip = "unknown"
+        
         logger.info('='*60)
-        logger.info('Gateway connected!')
+        logger.info('Gateway connected from %s', client_ip)
         logger.info('  Station: %s', msg.get('station'))
         logger.info('  Model: %s', msg.get('model'))
         logger.info('  Features: %s', msg.get('features'))
         logger.info('  Protocol: %s', msg.get('protocol'))
+        
+        # Store station version string for chipset detection (e.g., "2.0.6(mlinux/sx1303)")
+        self.station_version = msg.get('station', '')
         
         # Parse features string for protobuf support
         features_str = msg.get('features', '')
@@ -845,6 +778,60 @@ class TestMuxs(tu.Muxs):
         except Exception as e:
             logger.error('GPS toggle task error: %s', e)
     
+    def parse_pdu(self, pdu_hex: str) -> dict:
+        """Parse a LoRaWAN PDU from hex string and extract key fields."""
+        try:
+            pdu = bytes.fromhex(pdu_hex)
+            if len(pdu) < 12:
+                return {'error': 'PDU too short'}
+            
+            mhdr = pdu[0]
+            mtype = (mhdr >> 5) & 0x07
+            
+            mtype_names = {
+                0: 'JoinReq', 1: 'JoinAcc', 2: 'UnconfUp', 3: 'UnconfDn',
+                4: 'ConfUp', 5: 'ConfDn', 6: 'RejoinReq', 7: 'Proprietary'
+            }
+            
+            result = {
+                'MHdr': mhdr,
+                'MType': mtype_names.get(mtype, f'Unknown({mtype})'),
+            }
+            
+            # Data frames (MType 2-5)
+            if mtype in (2, 3, 4, 5):
+                devaddr = int.from_bytes(pdu[1:5], 'little')
+                fctrl = pdu[5]
+                fcnt = int.from_bytes(pdu[6:8], 'little')
+                fopts_len = fctrl & 0x0F
+                
+                result['DevAddr'] = devaddr
+                result['FCtrl'] = fctrl
+                result['FCnt'] = fcnt
+                result['FOptsLen'] = fopts_len
+                result['ADR'] = bool(fctrl & 0x80)
+                result['ACK'] = bool(fctrl & 0x20)
+                
+                # FPort if present
+                fhdr_len = 8 + fopts_len
+                if len(pdu) > fhdr_len + 4:  # +4 for MIC
+                    result['FPort'] = pdu[fhdr_len]
+                    payload_len = len(pdu) - fhdr_len - 1 - 4  # -1 FPort, -4 MIC
+                    result['PayloadLen'] = payload_len
+                
+                # MIC (last 4 bytes)
+                result['MIC'] = int.from_bytes(pdu[-4:], 'little')
+            
+            # Join request (MType 0)
+            elif mtype == 0 and len(pdu) >= 23:
+                result['JoinEUI'] = pdu[1:9].hex()
+                result['DevEUI'] = pdu[9:17].hex()
+                result['DevNonce'] = int.from_bytes(pdu[17:19], 'little')
+            
+            return result
+        except Exception as e:
+            return {'error': str(e)}
+    
     async def handle_updf(self, ws, msg):
         import time
         
@@ -854,34 +841,77 @@ class TestMuxs(tu.Muxs):
         if xtime:
             self.last_uplink_xtime = xtime
             self.last_uplink_gpstime = upinfo.get('gpstime', 0)
-            self.last_uplink_time = time.time()
+            now = time.time()
             
-            # Send LNS-initiated GPS time transfer per TC protocol spec
-            # This provides direct xtime->gpstime mapping using uplink's xtime
-            await self.send_timesync_transfer(ws, xtime)
+            # Send LNS-initiated GPS time transfer, but throttle to once per 10 seconds
+            # to avoid flooding the station with time sync messages
+            if now - self.last_uplink_time >= 10.0:
+                await self.send_timesync_transfer(ws, xtime)
+            self.last_uplink_time = now
         
-        # Extract fts (fine timestamp) for monitoring
+        # Extract radio info
+        freq = upinfo.get('Freq', msg.get('Freq', 0))
+        dr = upinfo.get('DR', msg.get('DR', 0))
+        rssi = upinfo.get('rssi', msg.get('rssi', 0))
+        snr = upinfo.get('snr', msg.get('snr', 0))
         fts = upinfo.get('fts', -1)
         fts_status = 'OK' if fts >= 0 else 'NONE'
         
-        if g_args.pdu_only:
-            # PDU-only mode - check what we got
-            has_pdu = 'pdu' in msg
-            has_parsed = 'MHdr' in msg or 'DevAddr' in msg
-            if has_pdu and not has_parsed:
-                logger.info('UPLINK (pdu-only): freq=%s DR=%s fts=%s (%s) pdu=%s...', 
-                           msg.get('Freq'), msg.get('DR'), fts, fts_status, msg.get('pdu', '')[:32])
-            elif has_pdu and has_parsed:
-                logger.warning('UPLINK: Has both pdu and parsed fields (pdu_only may not be working)')
-                logger.info('  DevAddr=%08X FCnt=%d fts=%s (%s)', msg.get('DevAddr', 0), msg.get('FCnt', 0), fts, fts_status)
-            else:
-                logger.info('UPLINK: DevAddr=%08X FCnt=%d freq=%s DR=%s fts=%s (%s)', 
-                           msg.get('DevAddr', 0), msg.get('FCnt', 0),
-                           msg.get('Freq'), msg.get('DR'), fts, fts_status)
+        # Format frequency nicely
+        freq_mhz = freq / 1e6 if freq > 1e6 else freq
+        
+        # Auto-detect message format and log appropriately
+        has_pdu = 'pdu' in msg and msg['pdu']
+        has_parsed = 'DevAddr' in msg
+        pdu_hex = msg.get('pdu', '')
+        
+        # Determine DevAddr and FCnt - either from parsed fields or by parsing PDU
+        dev_addr = msg.get('DevAddr', 0)
+        fcnt = msg.get('FCnt', 0)
+        fport = msg.get('FPort', None)
+        mtype = None
+        
+        if has_pdu and not has_parsed:
+            # PDU-only: parse the PDU to extract fields
+            parsed = self.parse_pdu(pdu_hex)
+            if 'error' not in parsed:
+                dev_addr = parsed.get('DevAddr', 0)
+                fcnt = parsed.get('FCnt', 0)
+                fport = parsed.get('FPort')
+                mtype = parsed.get('MType')
+        
+        # Format the log message
+        if mtype == 'JoinReq':
+            parsed = self.parse_pdu(pdu_hex) if has_pdu else {}
+            logger.info('JREQ: DevEUI=%s JoinEUI=%s freq=%.3f MHz DR=%d RSSI=%d SNR=%.1f fts=%s',
+                       parsed.get('DevEUI', '?'), parsed.get('JoinEUI', '?'),
+                       freq_mhz, dr, rssi, snr, fts_status)
         else:
-            logger.info('UPLINK: DevAddr=%08X FCnt=%d freq=%s DR=%s fts=%s (%s)', 
-                       msg.get('DevAddr', 0), msg.get('FCnt', 0),
-                       msg.get('Freq'), msg.get('DR'), fts, fts_status)
+            # Data frame (uplink)
+            fport_str = str(fport) if fport is not None else '-'
+            mode = 'pdu' if has_pdu and not has_parsed else 'parsed' if has_parsed else '?'
+            logger.info('UPLINK [%s]: DevAddr=%08X FCnt=%d FPort=%s freq=%.3f MHz DR=%d RSSI=%d SNR=%.1f fts=%s',
+                       mode, dev_addr, fcnt, fport_str, freq_mhz, dr, rssi, snr, fts_status)
+        
+        # TDoA geolocation: collect receptions from multiple gateways
+        if g_args.tdoa:
+            dev_addr = msg.get('DevAddr', 0)
+            fcnt = msg.get('FCnt', 0)
+            pdu = msg.get('pdu', '')
+            gpstime = upinfo.get('gpstime', 0)
+            gateway_id = getattr(self, 'gateway_id', 'unknown')
+            
+            g_tdoa_locator.add_reception(
+                gateway_id=gateway_id,
+                dev_addr=dev_addr,
+                fcnt=fcnt,
+                pdu=pdu,
+                gpstime=gpstime,
+                fts=fts,
+                rssi=rssi,
+                snr=snr,
+                freq=freq
+            )
         
         # Auto-downlink mode: send a test downlink for each uplink
         if g_args.auto_downlink:
@@ -1021,8 +1051,7 @@ class TestMuxs(tu.Muxs):
         
         if self.protobuf_enabled:
             # Send protobuf downlink
-            enc = ProtobufEncoder()
-            data = enc.encode_dnmsg(
+            data = encode_downlink_message(
                 deveui=deveui,
                 dclass=0,  # Class A
                 diid=diid,
@@ -1092,12 +1121,11 @@ class TestMuxs(tu.Muxs):
         The LNS echoes txtime and adds gpstime. This is for round-trip calculation.
         Do NOT include xtime here - that's for a separate LNS-initiated transfer.
         """
-        from datetime import datetime
-        gpstime = int(((datetime.utcnow() - tu.GPS_EPOCH).total_seconds() + tu.UTC_GPS_LEAPS) * 1e6)
+        from datetime import datetime, timezone
+        gpstime = int(((datetime.now(timezone.utc).replace(tzinfo=None) - tu.GPS_EPOCH).total_seconds() + tu.UTC_GPS_LEAPS) * 1e6)
         
-        enc = ProtobufEncoder()
         # Per protocol: only txtime + gpstime in response to station-initiated timesync
-        data = enc.encode_timesync_response(gpstime, txtime, 0)
+        data = encode_timesync_response(gpstime, txtime, 0)
         await ws.send(data)
         logger.debug('< MUXS: timesync response (protobuf, gpstime=%d)', gpstime)
     
@@ -1109,24 +1137,23 @@ class TestMuxs(tu.Muxs):
           
         The xtime comes from recent uplinks. This provides direct xtime->gpstime mapping.
         """
-        from datetime import datetime
-        gpstime = int(((datetime.utcnow() - tu.GPS_EPOCH).total_seconds() + tu.UTC_GPS_LEAPS) * 1e6)
+        from datetime import datetime, timezone
+        gpstime = int(((datetime.now(timezone.utc).replace(tzinfo=None) - tu.GPS_EPOCH).total_seconds() + tu.UTC_GPS_LEAPS) * 1e6)
         
-        enc = ProtobufEncoder()
         # Per protocol: xtime + gpstime for LNS-initiated transfer (no txtime)
-        data = enc.encode_timesync_response(gpstime, 0, xtime)
+        data = encode_timesync_response(gpstime, 0, xtime)
         await ws.send(data)
         logger.debug('< MUXS: timesync transfer (protobuf, xtime=0x%X, gpstime=%d)', xtime, gpstime)
     
     async def handle_binaryData(self, ws, data: bytes):
         """Handle binary (protobuf) messages from station."""
         if not self.protobuf_enabled:
-            logger.warning('Received binary data but protobuf not enabled (%d bytes)', len(data))
-            return
+            # Station sent binary but we requested JSON - could be buffered from before reconnect
+            # Decode it anyway to avoid losing messages
+            logger.debug('Received binary data in JSON mode (%d bytes) - decoding anyway', len(data))
         
         try:
-            decoder = ProtobufDecoder(data)
-            msg = decoder.decode()
+            msg = decode_protobuf_message(data)
             msgtype = msg.get('msgtype')
             
             logger.debug('> MUXS (protobuf): %s', msgtype)
@@ -1153,6 +1180,22 @@ class TestMuxs(tu.Muxs):
 async def main(args):
     global g_args
     g_args = args
+    
+    # Load gateway locations for TDoA
+    if args.gateway_locations:
+        try:
+            with open(args.gateway_locations, 'r') as f:
+                locations = json.load(f)
+            for gw_id, loc in locations.items():
+                g_tdoa_locator.add_gateway(gw_id, loc['lat'], loc['lon'], loc.get('alt', 0.0))
+        except Exception as e:
+            logger.error('Failed to load gateway locations: %s', e)
+            if args.tdoa:
+                logger.error('TDoA requires valid gateway locations file')
+                sys.exit(1)
+    elif args.tdoa:
+        logger.warning('TDoA enabled but no --gateway-locations file specified')
+        logger.warning('Create a JSON file like: {"10.10.200.140": {"lat": 37.7749, "lon": -122.4194}, ...}')
     
     # Determine the host IP to use for muxs redirect
     host_ip = args.host if args.host else get_local_ip()
@@ -1188,6 +1231,8 @@ async def main(args):
             logger.info('  single_radio: BAD CONFIG (only radio_1 disabled)')
         else:
             logger.info('  single_radio: enabled (proper 3-channel config)')
+    if args.tdoa:
+        logger.info('  tdoa: ENABLED (%d gateways configured)', len(g_tdoa_locator.gateways))
     logger.info('='*60)
     
     ws_scheme = 'wss' if args.tls else 'ws'
@@ -1251,6 +1296,10 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', action='store_true', help='Verbose logging')
     parser.add_argument('--gps-toggle', type=int, metavar='SECS', default=0,
                        help='Toggle GPS enable/disable every N seconds (0=disabled)')
+    parser.add_argument('--tdoa', action='store_true',
+                       help='Enable TDoA geolocation (requires --gateway-locations)')
+    parser.add_argument('--gateway-locations', type=str, metavar='FILE',
+                       help='JSON file with gateway locations: {"ip_address": {"lat": N, "lon": E, "alt": M}, ...}')
     
     args = parser.parse_args()
     
