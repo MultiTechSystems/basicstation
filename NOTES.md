@@ -129,3 +129,37 @@ See `src/selftest_s2e.c` for the test implementation.
 ### Documentation
 - Could add troubleshooting section for common Raspberry Pi issues (SPI permissions, GPIO reset pin configuration)
 - Could document environment variables like `LORAGW_SPI` and `LORAGW_SPI_SPEED` from the HAL patch
+
+### LBT Enhancements (from sx130xconf.c)
+- Full SX1261 LBT support for SX1302/SX1303 (currently stubbed)
+- AS923-2/3/4 regional LBT parameters
+- LNS-provided LBT channel configuration via router_config
+- LNS-provided RSSI target override
+
+### Protobuf Protocol Enhancements
+- Add `runcmd` response message (currently one-way)
+- Add `rmtsh` session management improvements
+- Consider adding compression on top of protobuf for further savings
+- Auto-generated Python protobuf (`tc_pb2.py`) for tc-server.py is working - consider packaging
+
+### TC Server Improvements (tc-server.py)
+- TDoA geolocation (3+ gateways receiving same packet)
+- Better handling of station reconnects with stale protobuf state
+- Configurable timesync interval
+- Class B beacon scheduling
+
+### Test Suite Enhancements
+- Add integration tests for protobuf + pdu-only combined mode
+- Add stress tests for high uplink rates with protobuf
+- Add tests for GPS position reporting when implemented
+- Consider fuzzing protobuf decoder with malformed inputs
+
+### Hardware Support
+- SX1261 standalone support (for LBT and FSK)
+- Fine timestamp calibration per gateway
+- Multi-SX1302 configurations (beyond current master/slave)
+
+### Protocol Extensions
+- Downlink acknowledgment improvements (detailed TX status)
+- Gateway statistics message (periodic health/metrics)
+- Remote configuration updates (beyond router_config)
