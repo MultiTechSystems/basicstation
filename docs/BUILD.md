@@ -74,6 +74,37 @@ make super-clean
 make platform=rpi64 variant=std
 ```
 
+## Important: Clean Builds When Switching Branches
+
+When switching between git branches, especially branches with different feature sets,
+you must perform a clean build to avoid issues:
+
+```bash
+# After switching branches
+git checkout <branch-name>
+
+# Clean build directories for the variants you use
+rm -rf build-linux-testsim build-linux-testms
+
+# Or clean all build artifacts
+make platform=linux variant=testsim clean
+make platform=linux variant=testms clean
+
+# Then rebuild
+make platform=linux variant=testsim
+```
+
+**Why this matters:**
+- Coverage files (`.gcda`, `.gcno`) are tied to specific object file checksums
+- Stale coverage data from a previous branch causes "overwriting profile data with
+  different checksum" errors and can cause test failures
+- Object files compiled with different feature flags may have incompatible interfaces
+
+**Symptoms of stale build artifacts:**
+- Tests that previously passed now fail with unexpected errors
+- `libgcov profiling error: overwriting an existing profile data with a different checksum`
+- Linker errors or runtime crashes after switching branches
+
 ### Running
 
 ```bash
