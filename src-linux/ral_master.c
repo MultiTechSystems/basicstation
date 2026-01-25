@@ -464,7 +464,7 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
     u1_t  tx_cmd = nocca ? RAL_CMD_TX_NOCCA : RAL_CMD_TX;
     req.cmd = tx_cmd;
     req.rctx = txjob->rctx;
-    req.rps = (s2e_dr2rps(s2ctx, txjob->dr)
+    req.rps = (s2e_dr2rps_dn(s2ctx, txjob->dr)
                | (txjob->txflags & TXFLAG_BCN ? RPS_BCN : 0));
     req.xtime = txjob->xtime;
     req.freq = txjob->freq;
@@ -538,7 +538,11 @@ static void slave_challoc_cb (void* ctx, challoc_t* ch, int flag) {
 
 int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs, lbt_config_t* lbt_config) {
     (void)lbt_config;  // TODO: Pass LBT config to slaves
-    if( strncmp(hwspec, "sx1301/", 7) != 0 ) {
+    // Accept sx1301/N, sx1302/N, or sx1303/N from LNS
+    // The actual chip type is detected by the HAL, hwspec is informational
+    if( strncmp(hwspec, "sx1301/", 7) != 0 &&
+        strncmp(hwspec, "sx1302/", 7) != 0 &&
+        strncmp(hwspec, "sx1303/", 7) != 0 ) {
         LOG(MOD_RAL|ERROR, "Unsupported hwspec=%s", hwspec);
         return 0;
     }

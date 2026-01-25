@@ -379,7 +379,7 @@ void s2e_flushRxjobs (s2ctx_t* s2ctx) {
         dbuf_t lbuf = { .buf = NULL };
         if( log_special(MOD_S2E|VERBOSE, &lbuf) )
             xprintf(&lbuf, "RX %F DR%d %R snr=%.1f rssi=%d xtime=0x%lX fts=%d - ",
-                    j->freq, j->dr, s2e_dr2rps(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime, j->fts);
+                    j->freq, j->dr, s2e_dr2rps_up(s2ctx, j->dr), j->snr/4.0, -j->rssi, j->xtime, j->fts);
 
 #if defined(CFG_protobuf)
         if( tcpb_enabled() ) {
@@ -607,7 +607,7 @@ static void send_dntxed (s2ctx_t* s2ctx, txjob_t* txjob) {
         txjob, txjob->deveui ? "dntxed" : "on air",
         txjob->freq, (double)txjob->txpow/TXPOW_SCALE,
         txjob->txunit, ral_rctx2txunit(txjob->rctx),     // sending/receiving antenna
-        txjob->dr, s2e_dr2rps(s2ctx, txjob->dr),
+        txjob->dr, s2e_dr2rps_dn(s2ctx, txjob->dr),
         txjob->len, &s2ctx->txq.txdata[txjob->off], txjob->len);
 }
 
@@ -756,7 +756,7 @@ static s2_t calcTxpow (s2ctx_t* s2ctx, txjob_t* txjob) {
 }
 
 static void updateAirtimeTxpow (s2ctx_t* s2ctx, txjob_t* txjob) {
-    txjob->airtime = s2e_calcDnAirTime(s2e_dr2rps(s2ctx, txjob->dr), txjob->len, txjob->addcrc, txjob->preamble);
+    txjob->airtime = s2e_calcDnAirTime(s2e_dr2rps_dn(s2ctx, txjob->dr), txjob->len, txjob->addcrc, txjob->preamble);
     txjob->txpow = calcTxpow(s2ctx, txjob);
 }
 
@@ -1067,7 +1067,7 @@ ustime_t s2e_nextTxAction (s2ctx_t* s2ctx, u1_t txunit) {
         curr, txdelta,
         curr->freq, (double)curr->txpow/TXPOW_SCALE,
         curr->txunit, ral_rctx2txunit(curr->rctx),     // sending/receiving antenna
-        curr->dr, s2e_dr2rps(s2ctx, curr->dr),
+        curr->dr, s2e_dr2rps_dn(s2ctx, curr->dr),
         curr->len, &s2ctx->txq.txdata[curr->off], curr->len);
 
     int txerr = ral_tx(curr, s2ctx, ccaDisabled);
@@ -1169,8 +1169,9 @@ static void s2e_bcntimeout (tmr_t* tmr) {
 
 static bool hasFastLora(s2ctx_t* s2ctx, int minDR, int maxDR, rps_t* rpsp) {
     for( int dr=minDR; dr<=maxDR; dr++ ) {
-        rps_t rps = s2e_dr2rps(s2ctx, dr);
-        if( rps_bw(rps) == BW250 || rps_bw(rps) == BW500 ) {
+        // Use uplink DR table (handles both symmetric and asymmetric DR configs)
+        rps_t rps = s2e_dr2rps_up(s2ctx, dr);
+        if( rps != RPS_ILLEGAL && (rps_bw(rps) == BW250 || rps_bw(rps) == BW500) ) {
             *rpsp = rps;
             return true;
         }
@@ -1180,7 +1181,8 @@ static bool hasFastLora(s2ctx_t* s2ctx, int minDR, int maxDR, rps_t* rpsp) {
 
 static bool hasFSK(s2ctx_t* s2ctx, int minDR, int maxDR) {
     for( int dr=minDR; dr<=maxDR; dr++ ) {
-        if( s2e_dr2rps(s2ctx, dr) == RPS_FSK )
+        // Use uplink DR table (handles both symmetric and asymmetric DR configs)
+        if( s2e_dr2rps_up(s2ctx, dr) == RPS_FSK )
             return true;
     }
     return false;
@@ -1190,8 +1192,9 @@ static bool any125kHz(s2ctx_t* s2ctx, int minDR, int maxDR, rps_t* min_rps, rps_
     *min_rps = *max_rps = RPS_ILLEGAL;
     bool any125kHz = false;
     for( int dr=minDR; dr<=maxDR; dr++ ) {
-        rps_t rps = s2e_dr2rps(s2ctx, dr);
-        if( rps != RPS_FSK && rps_bw(rps) == BW125 ) {
+        // Use uplink DR table (handles both symmetric and asymmetric DR configs)
+        rps_t rps = s2e_dr2rps_up(s2ctx, dr);
+        if( rps != RPS_FSK && rps != RPS_ILLEGAL && rps_bw(rps) == BW125 ) {
             any125kHz = true;
             *min_rps = rps;
             if( *max_rps == RPS_ILLEGAL ) *max_rps = rps;
@@ -2744,3 +2747,24 @@ int s2e_onBinary (s2ctx_t* s2ctx, u1_t* data, ujoff_t datalen) {
 }
 #endif
 
+// ============================================================================
+// Test wrappers - expose static functions for unit testing
+// ============================================================================
+#if defined(CFG_selftests)
+
+// Wrapper for any125kHz() - tests channel allocation bandwidth detection
+bool s2e_test_any125kHz(s2ctx_t* s2ctx, int minDR, int maxDR, rps_t* min_rps, rps_t* max_rps) {
+    return any125kHz(s2ctx, minDR, maxDR, min_rps, max_rps);
+}
+
+// Wrapper for hasFastLora() - tests 250/500kHz detection
+bool s2e_test_hasFastLora(s2ctx_t* s2ctx, int minDR, int maxDR, rps_t* rpsp) {
+    return hasFastLora(s2ctx, minDR, maxDR, rpsp);
+}
+
+// Wrapper for hasFSK() - tests FSK modulation detection
+bool s2e_test_hasFSK(s2ctx_t* s2ctx, int minDR, int maxDR) {
+    return hasFSK(s2ctx, minDR, maxDR);
+}
+
+#endif // CFG_selftests

@@ -49,6 +49,7 @@ extern void selftest_ujdec ();
 extern void selftest_ujenc ();
 extern void selftest_xprintf ();
 extern void selftest_fs ();
+extern void selftest_s2e ();
 #if defined(CFG_protobuf)
 extern int selftest_tcpb ();
 #endif

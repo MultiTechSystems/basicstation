@@ -218,7 +218,7 @@ int ral_tx (txjob_t* txjob, s2ctx_t* s2ctx, int nocca) {
     } else {
         pkt_tx.preamble = txjob->preamble;
     }
-    rps_t rps = s2e_dr2rps(s2ctx, txjob->dr);
+    rps_t rps = s2e_dr2rps_dn(s2ctx, txjob->dr);
     ral_rps2lgw(rps, &pkt_tx);
     pkt_tx.freq_hz    = txjob->freq;
     pkt_tx.count_us   = txjob->xtime;
@@ -357,7 +357,11 @@ static void rxpolling (tmr_t* tmr) {
 
 
 int ral_config (str_t hwspec, u4_t cca_region, char* json, int jsonlen, chdefl_t* upchs, lbt_config_t* lbt_config) {
-    if( strcmp(hwspec, "sx1301/1") != 0 ) {
+    // Accept sx1301/1, sx1302/1, or sx1303/1 from LNS
+    // The actual chip type is detected by the HAL, hwspec is informational
+    if( strcmp(hwspec, "sx1301/1") != 0 &&
+        strcmp(hwspec, "sx1302/1") != 0 &&
+        strcmp(hwspec, "sx1303/1") != 0 ) {
         LOG(MOD_RAL|ERROR, "Unsupported hwspec=%s", hwspec);
         return 0;
     }

@@ -45,6 +45,7 @@ static void (*const selftest_fns[])() = {
     selftest_ujenc,
     selftest_xprintf,
     selftest_fs,
+    selftest_s2e,
     NULL
 };
 
