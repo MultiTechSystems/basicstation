@@ -65,8 +65,8 @@ static void tc_muxs_connection (conn_t* _conn, int ev) {
         uj_encOpen(&b, '{');
         uj_encKV(&b, "msgtype",  's', "version");
         uj_encKV(&b, "station",  's', CFG_version);
-        uj_encKV(&b, "firmware", 's', sys_version());
-        uj_encKV(&b, "package",  's', sys_version());
+        uj_encKV(&b, "firmware", 's', sys_firmware());
+        uj_encKV(&b, "package",  's', sys_package());
         // uj_encKV(&b, "os",       's', sys_osversion()); 
         uj_encKV(&b, "model",    's', CFG_platform);
         uj_encKV(&b, "protocol", 'i', MUXS_PROTOCOL_VERSION);

@@ -97,6 +97,7 @@ static int    workerPid;
 static str_t  radioInit;
 static str_t  radioDevice;
 static str_t  versionTxt;
+static str_t  firmwareTxt;
 static char*  updfile;
 static char*  temp_updfile;
 static int    updfd = -1;
@@ -401,7 +402,8 @@ void sys_ini () {
     LOG(MOD_SYS|INFO, "Logging     : %s (maxsize=%d, rotate=%d)\n",
         logfile.path==NULL ? "stderr" : logfile.path, logfile.size, logfile.rotate);
     LOG(MOD_SYS|INFO, "Station Ver : %s",  CFG_version " " CFG_bdate);
-    LOG(MOD_SYS|INFO, "Package Ver : %s",  sys_version());
+    LOG(MOD_SYS|INFO, "Package Ver : %s",  sys_package());
+    LOG(MOD_SYS|INFO, "Firmware Ver: %s",  sys_firmware() ? sys_firmware() : "(not available)");
     LOG(MOD_SYS|INFO, "mbedTLS Ver : %s",  MBEDTLS_VERSION_STRING);
     LOG(MOD_SYS|INFO, "proto EUI   : %:E\t(%s)", protoEUI, protoEuiSrc);
     LOG(MOD_SYS|INFO, "prefix EUI  : %:E\t(%s)", prefixEUI, prefixEuiSrc);
@@ -478,6 +480,51 @@ sL_t sys_utc () {
 
 str_t sys_version () {
     return readFileAsString("version", ".txt", &versionTxt);
+}
+
+str_t sys_firmware () {
+    // Try to read firmware version from system files
+    // Check /etc/mlinux-version first (mLinux specific)
+    if( firmwareTxt == NULL ) {
+        FILE* f = fopen("/etc/mlinux-version", "r");
+        if( f == NULL )
+            f = fopen("/etc/issue", "r");
+        if( f ) {
+            char buf[128];
+            if( fgets(buf, sizeof(buf), f) ) {
+                // Trim trailing whitespace and escape sequences (like \n \l in /etc/issue)
+                int n = strlen(buf);
+                while( n > 0 && strchr(" \t\r\n", buf[n-1]) ) --n;
+                buf[n] = 0;
+                // Remove escape sequences like \n, \l, etc. from /etc/issue
+                char* p = buf;
+                while( (p = strchr(p, '\\')) != NULL ) {
+                    if( p[1] ) {
+                        memmove(p, p+2, strlen(p+2)+1);
+                    } else {
+                        *p = 0;
+                        break;
+                    }
+                }
+                // Trim again after removing escapes
+                n = strlen(buf);
+                while( n > 0 && strchr(" \t\r\n", buf[n-1]) ) --n;
+                buf[n] = 0;
+                firmwareTxt = rt_strdup(buf);
+            }
+            fclose(f);
+        }
+    }
+    return firmwareTxt;
+}
+
+str_t sys_package () {
+#if defined(CFG_package_version)
+    return CFG_package_version;
+#else
+    // Fall back to version.txt if no compile-time version defined
+    return sys_version();
+#endif
 }
 
 /* FW Update ************************************ */
@@ -1059,8 +1106,8 @@ static int parse_opt (int key, char* arg, struct argp_state* state) {
     }
     case 'v': {
         fputs("Station: " CFG_version " " CFG_bdate "\n", stdout);
-        readFileAsString("version", ".txt", &versionTxt);
-        fprintf(stdout, "Package: %s\n", versionTxt);
+        fprintf(stdout, "Package: %s\n", sys_package());
+        fprintf(stdout, "Firmware: %s\n", sys_firmware() ? sys_firmware() : "(not available)");
         exit(0);
     }
     case ARGP_KEY_END: {

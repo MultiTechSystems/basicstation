@@ -88,6 +88,8 @@ void  sys_commitConfigUpdate ();
 void  sys_backupConfig (int cred_cat);
 
 str_t sys_version ();
+str_t sys_firmware ();
+str_t sys_package ();
 str_t sys_uri     (int cred_cat, int cred_set);
 void  sys_saveUri (int cred_cat, str_t uri);
 u4_t  sys_crcCred (int cred_cat, int cred_set);

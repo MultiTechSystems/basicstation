@@ -2,27 +2,27 @@
 
 ## TODO
 
-### Version Info in MUXS Messages
-The `firmware` and `package` fields in the MUXS version message are currently `null`:
-```json
-{"msgtype":"version","station":"2.1.0(mlinux/sx1303)","firmware":null,"package":null,...}
+### Version Info in MUXS Messages (IMPLEMENTED)
+The `firmware` and `package` fields in the MUXS version message are now populated:
+
+**Station-side changes (committed):**
+- `sys_firmware()`: Reads from `/etc/mlinux-version` (mLinux) or `/etc/issue` (fallback)
+- `sys_package()`: Uses `CFG_package_version` if defined at compile time, else falls back to `version.txt`
+- `tc.c`: Updated to use `sys_firmware()` and `sys_package()`
+- Startup log and `-v` output updated to show both values
+
+**Bitbake recipe change needed:**
+Add to the recipe's `EXTRA_OEMAKE` to inject the package version at compile time:
+```bitbake
+EXTRA_OEMAKE += 'CFG_package_version=\"${PV}\"'
 ```
 
-**Current behavior:** Both fields read from `version.txt` in station home directory via `sys_version()`.
+This will define `CFG_package_version` as a string macro (e.g., `"2.0.6-27"`) that `sys_package()` returns.
 
-**Proposed improvement:**
-1. **`package`**: Embed at build time via Bitbake - the recipe knows the package version (e.g., `2.0.6-27`)
-   - Add `#define CFG_package_version "..."` in makefile or via compiler flag
-   - Bitbake can inject via `EXTRA_OEMAKE += 'CFG_PACKAGE_VERSION="${PV}"'`
-   
-2. **`firmware`**: Read from `/etc/issue` or `/etc/mlinux-version` on gateway at runtime
-   - More accurate - reflects actual gateway firmware
-   - Fallback to `version.txt` if file doesn't exist
-
-**Files to modify:**
-- `src/tc.c` lines 68-69 (version message encoding)
-- `src-linux/sys_linux.c` - add `sys_firmware_version()` function
-- Bitbake recipe for compile-time package version
+**Expected output after recipe update:**
+```json
+{"msgtype":"version","station":"2.1.0(mlinux/sx1303)","firmware":"mLinux 6.0.2","package":"2.0.6-27",...}
+```
 
 ### Fine Timestamp Support (CLARIFIED)
 GitHub issue #177 was caused by incorrectly combining `fts` with `rxtime`. The original
