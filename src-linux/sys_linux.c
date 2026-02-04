@@ -484,51 +484,55 @@ str_t sys_version () {
 
 str_t sys_firmware () {
     // Try to read firmware version from system files
-    // Prefer /etc/os-release PRETTY_NAME (standard, works on mLinux and most Linux)
     if( firmwareTxt == NULL ) {
-        FILE* f = fopen("/etc/os-release", "r");
+        // For mPower/mLinux: parse /etc/issue for "Release:" line (mPower version)
+        FILE* f = fopen("/etc/issue", "r");
         if( f ) {
             char buf[256];
+            char release[32] = {0};
+            char version[32] = {0};
             while( fgets(buf, sizeof(buf), f) ) {
-                if( strncmp(buf, "PRETTY_NAME=", 12) == 0 ) {
-                    char* val = buf + 12;
-                    // Remove quotes if present
-                    if( *val == '"' ) val++;
+                if( strncmp(buf, "Release:", 8) == 0 ) {
+                    char* val = buf + 8;
+                    while( *val == ' ' ) val++;
                     int n = strlen(val);
-                    while( n > 0 && strchr(" \t\r\n\"", val[n-1]) ) --n;
+                    while( n > 0 && strchr(" \t\r\n", val[n-1]) ) --n;
                     val[n] = 0;
-                    firmwareTxt = rt_strdup(val);
-                    break;
+                    snprintf(release, sizeof(release), "%s", val);
+                } else if( strncmp(buf, "Version:", 8) == 0 ) {
+                    char* val = buf + 8;
+                    while( *val == ' ' ) val++;
+                    int n = strlen(val);
+                    while( n > 0 && strchr(" \t\r\n", val[n-1]) ) --n;
+                    val[n] = 0;
+                    snprintf(version, sizeof(version), "%s", val);
                 }
             }
             fclose(f);
+            if( release[0] ) {
+                char result[128];
+                if( version[0] )
+                    snprintf(result, sizeof(result), "mPower %s (%s)", release, version);
+                else
+                    snprintf(result, sizeof(result), "mPower %s", release);
+                firmwareTxt = rt_strdup(result);
+            }
         }
-        // Fallback to /etc/issue if os-release didn't work
+        // Fallback to /etc/os-release PRETTY_NAME (standard on most Linux)
         if( firmwareTxt == NULL ) {
-            f = fopen("/etc/issue", "r");
+            f = fopen("/etc/os-release", "r");
             if( f ) {
-                char buf[128];
-                if( fgets(buf, sizeof(buf), f) ) {
-                    // Trim trailing whitespace and escape sequences (like \n \l in /etc/issue)
-                    int n = strlen(buf);
-                    while( n > 0 && strchr(" \t\r\n", buf[n-1]) ) --n;
-                    buf[n] = 0;
-                    // Remove escape sequences like \n, \l, etc. from /etc/issue
-                    char* p = buf;
-                    while( (p = strchr(p, '\\')) != NULL ) {
-                        if( p[1] ) {
-                            memmove(p, p+2, strlen(p+2)+1);
-                        } else {
-                            *p = 0;
-                            break;
-                        }
+                char buf[256];
+                while( fgets(buf, sizeof(buf), f) ) {
+                    if( strncmp(buf, "PRETTY_NAME=", 12) == 0 ) {
+                        char* val = buf + 12;
+                        if( *val == '"' ) val++;
+                        int n = strlen(val);
+                        while( n > 0 && strchr(" \t\r\n\"", val[n-1]) ) --n;
+                        val[n] = 0;
+                        firmwareTxt = rt_strdup(val);
+                        break;
                     }
-                    // Trim again after removing escapes
-                    n = strlen(buf);
-                    while( n > 0 && strchr(" \t\r\n", buf[n-1]) ) --n;
-                    buf[n] = 0;
-                    if( n > 0 )
-                        firmwareTxt = rt_strdup(buf);
                 }
                 fclose(f);
             }
