@@ -24,16 +24,20 @@ The `firmware` and `package` fields in the MUXS version message are currently `n
 - `src-linux/sys_linux.c` - add `sys_firmware_version()` function
 - Bitbake recipe for compile-time package version
 
-### feature/fine-timestamp branch
-Create a feature branch to re-enable fine timestamp support in rxtime:
-- Re-add `uj_encFTime` function (%.9f precision for nanoseconds)
-- Re-add `'F'` format specifier in `encArg()` switch
-- Update `s2e_flushRxjobs()` to use `'F'` format when `fts > -1`:
-  ```c
-  "rxtime", j->fts > -1 ? 'F' : 'T', j->fts > -1 ? (sL_t)(rt_getUTC()/1e6) + (double)j->fts/1e9 : rt_getUTC()/1e6,
-  ```
-- Investigate/address GitHub issue #177 that caused the original revert
-- Original commits: da22ab6 (add), 5c54f11 (revert)
+### Fine Timestamp Support (CLARIFIED)
+GitHub issue #177 was caused by incorrectly combining `fts` with `rxtime`. The original
+implementation tried to add fine timestamp nanoseconds to the rxtime field, but this is
+wrong because:
+- `rxtime`: GPS-synced timestamp of packet arrival (microsecond precision)
+- `fts`: Separate 32-bit counter for a specific point in packet reception (for TDoA)
+
+These measure different events and cannot be combined. The correct approach (now implemented):
+- `fts` is sent as a **separate field** in uplink messages
+- `rxtime` remains the consistent GPS-synced timestamp
+- LNS uses `fts` independently for TDoA geolocation when available
+
+**Status:** `fts` field is populated in both `ral_lgw.c` (single-concentrator) and
+`ral_slave.c` (master/slave mode) for SX1302/SX1303 when `ftime_received` is set by HAL.
 
 ## Completed Today (2026-01-23)
 
