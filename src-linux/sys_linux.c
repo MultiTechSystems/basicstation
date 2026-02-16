@@ -1022,10 +1022,11 @@ static void startupMaster2 (tmr_t* tmr) {
 #if defined(CFG_prod)
     rt_addFeature("prod");  // certain development/test/debug features not accepted
 #endif
-    rt_addFeature("updn-dr");  // supports separate uplink/downlink datarate tables (RP002-1.0.5)
-    rt_addFeature("dutyconf");  // supports duty_cycle_enabled in router_config
-    rt_addFeature("pdu-only");  // supports raw PDU mode via pdu_only in router_config
-    rt_addFeature("lbtconf");  // supports explicit LBT channel configuration from LNS
+    rt_addFeature("mts");  // MultiTech Systems fork identifier
+    rt_addFeature("updn-dr");  // separate up/down DR tables, implies SF5/SF6 (SX1302/SX1303)
+    rt_addFeature("duty-conf");  // duty cycle configurable via router_config
+    rt_addFeature("pdu-conf");  // PDU mode configurable via router_config
+    rt_addFeature("lbt-conf");  // LBT channel configuration from LNS
     sys_enableCmdFIFO(makeFilepath("~/cmd",".fifo",NULL,0));
     if( gpsDevice ) {
         rt_addFeature("gps");
