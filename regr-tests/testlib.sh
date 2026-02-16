@@ -112,7 +112,7 @@ if [[ "$timeout" != "" ]]; then
     (cnt=0
      while ((cnt++ < $timeout)); do
          sleep 1;
-         if [[ ! -d /proc/$timeout ]]; then
+         if [[ ! -d /proc/$testpid ]]; then
              exit 0
          fi
      done
