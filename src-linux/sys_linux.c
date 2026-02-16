@@ -1083,7 +1083,8 @@ static void startupMaster2 (tmr_t* tmr) {
 #if defined(CFG_prod)
     rt_addFeature("prod");  // certain development/test/debug features not accepted
 #endif
-    rt_addFeature("updn-dr");  // supports separate uplink/downlink datarate tables (RP002-1.0.5)
+    rt_addFeature("mts");  // MultiTech Systems fork identifier
+    rt_addFeature("updn-dr");  // separate up/down DR tables, implies SF5/SF6 (SX1302/SX1303)
     sys_enableCmdFIFO(makeFilepath("~/cmd",".fifo",NULL,0));
 #if defined(CFG_usegpsd)
     if( gpsEnabled && deviceGPSSupport()) {
