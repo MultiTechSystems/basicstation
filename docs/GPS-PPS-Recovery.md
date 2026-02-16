@@ -8,7 +8,7 @@ This feature improves timing reliability by detecting and recovering from GPS/PP
 
 ## Features
 
-### 1. GPS Control via LNS (`gps-ctrl`)
+### 1. GPS Control via LNS (`gps-conf`)
 
 The LNS can enable or disable GPS processing via the `gps_enable` field in `router_config`:
 
@@ -20,7 +20,7 @@ The LNS can enable or disable GPS processing via the `gps_enable` field in `rout
 }
 ```
 
-**Feature Flag:** `gps-ctrl` - Indicates station supports LNS-controlled GPS enable/disable.
+**Feature Flag:** `gps-conf` - Indicates station supports LNS-controlled GPS enable/disable.
 
 **Use Cases:**
 - Disable GPS when hardware issues are detected
@@ -118,7 +118,7 @@ Station exits after 15 consecutive drift failures.
 
 - `src/timesync.c` - PPS recovery, session detection, drift monitoring
 - `src/s2e.c` - `gps_enable` field parsing from router_config
-- `src-linux/sys_linux.c` - GPS device control, `gps-ctrl` feature flag
+- `src-linux/sys_linux.c` - GPS device control, `gps-conf` feature flag
 
 ### Key Changes
 

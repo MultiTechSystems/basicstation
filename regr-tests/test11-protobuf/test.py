@@ -434,23 +434,24 @@ class TestMuxs(tu.Muxs):
     def get_router_config(self):
         config = dict(tu.router_config_EU863_6ch)
         # Enable protobuf if station supports it
-        if 'protobuf' in self.station_capabilities:
+        if 'lbs-dp' in self.station_capabilities:
             config['protocol_format'] = 'protobuf'
             self.protobuf_enabled = True
             logger.info('Enabling protobuf protocol')
         return config
 
     async def handle_version(self, ws, msg):
-        """Check for protobuf capability in version message."""
-        self.station_capabilities = msg.get('capabilities', [])
+        """Check for lbs-dp capability in version message."""
+        features_str = msg.get('features', '')
+        self.station_capabilities = features_str.split() if features_str else []
         logger.info('Station capabilities: %s', self.station_capabilities)
         
-        if 'protobuf' not in self.station_capabilities:
-            logger.error('Station does not advertise protobuf capability!')
+        if 'lbs-dp' not in self.station_capabilities:
+            logger.error('Station does not advertise lbs-dp capability!')
             await self.testDone(1)
             return
         
-        logger.info('Station advertises protobuf capability - TEST PASSED')
+        logger.info('Station advertises lbs-dp capability - TEST PASSED')
         
         # Send router_config with protobuf enabled
         rconf = self.get_router_config()

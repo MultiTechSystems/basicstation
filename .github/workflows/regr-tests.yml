@@ -72,12 +72,21 @@ jobs:
             lcov -t "s2core" $(for f in $info_files; do echo "-a $f"; done) -o s2core.info
             # Remove any entries for non-existent source files (e.g., srctype)
             lcov --remove s2core.info '*/srctype' -o s2core.info || true
-            genhtml s2core.info -o s2core-html --ignore-errors source
+            # Generate HTML report (disable function coverage pages which create files with colons)
+            genhtml s2core.info -o s2core-html --ignore-errors source --no-function-coverage
           else
             echo "No coverage files found"
             mkdir -p s2core-html
             echo "No coverage data" > s2core-html/index.html
           fi
+      - name: Sanitize filenames for artifact upload
+        run: |
+          # Rename files with characters invalid on Windows/NTFS (: < > | * ? ")
+          cd s2core-html
+          find . -type f -name '*:*' 2>/dev/null | while read f; do
+            newname=$(echo "$f" | sed 's/:/_/g')
+            mv "$f" "$newname" 2>/dev/null || true
+          done
       - name: Upload combined coverage report
         uses: actions/upload-artifact@v4
         with:

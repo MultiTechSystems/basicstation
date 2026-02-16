@@ -618,7 +618,7 @@ case J_duty_cycle_limits: {
 ```c
 static void startupMaster2 (tmr_t* tmr) {
     // ... existing features ...
-    rt_addFeature("dutyconf");  // supports configurable duty cycle
+    rt_addFeature("duty-conf");  // supports configurable duty cycle
 }
 ```
 

@@ -607,7 +607,7 @@ class TestMuxs(tu.Muxs):
             logger.info('PDU-only mode ENABLED')
         
         # Protobuf: only enable if user requested it AND station supports it
-        if g_args.protobuf and 'protobuf' in self.station_features:
+        if g_args.protobuf and 'lbs-dp' in self.station_features:
             config['protocol_format'] = 'protobuf'
             self.protobuf_enabled = True
             logger.info('Protobuf binary protocol ENABLED')
@@ -732,7 +732,7 @@ class TestMuxs(tu.Muxs):
         # Parse features string for protobuf support
         features_str = msg.get('features', '')
         self.station_features = features_str.split() if features_str else []
-        if 'protobuf' in self.station_features:
+        if 'lbs-dp' in self.station_features:
             logger.info('  Protobuf: supported')
         
         logger.info('='*60)

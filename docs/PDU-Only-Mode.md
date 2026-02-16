@@ -40,7 +40,7 @@ This ensures symmetry - when an LNS enables base64 encoding, both uplink and dow
 }
 ```
 
-**Feature Flag:** Station advertises `pdu-only` in the `features` field of the `version` message.
+**Feature Flag:** Station advertises `pdu-conf` in the `features` field of the `version` message.
 
 ## Table of Contents
 
@@ -111,12 +111,12 @@ The station advertises support for PDU-only mode in the `version` message:
 {
   "msgtype": "version",
   "station": "2.0.6(linux/std)",
-  "features": "rmtsh pdu-only",
+  "features": "rmtsh pdu-conf",
   ...
 }
 ```
 
-The LNS should check for the `pdu-only` feature before enabling this mode.
+The LNS should check for the `pdu-conf` feature before enabling this mode.
 
 ## Message Format
 
@@ -227,7 +227,7 @@ The raw frame is sent without field parsing.
 - `src/s2e.c` - Implements flags, config parsing, uplink encoding, and downlink decoding
 - `src/uj.c` - Implements `uj_encBase64()` for encoding and `uj_base64str()` for decoding (uses mbedTLS)
 - `src/kwlist.txt` - Defines `pdu_only` and `pdu_encoding` keywords for JSON parsing
-- `src-linux/sys_linux.c` - Advertises `pdu-only` feature
+- `src-linux/sys_linux.c` - Advertises `pdu-conf` feature
 
 ### Dependencies
 
@@ -235,7 +235,7 @@ Base64 encoding/decoding uses the mbedTLS library (`mbedtls_base64_encode` and `
 
 ### Code Flow
 
-1. **Startup:** Station sends `version` message with `pdu-only` in features
+1. **Startup:** Station sends `version` message with `pdu-conf` in features
 2. **Configuration:** LNS sends `router_config` with `pdu_only: true` and optionally `pdu_encoding: "base64"`
 3. **Parsing:** Station sets `s2e_pduOnly = 1` and `s2e_pduEncoding` based on config, logs mode change
 4. **Uplink:** When frame received:
@@ -285,7 +285,7 @@ For gateways with limited backhaul bandwidth (cellular, satellite), base64 encod
 ## Backward Compatibility
 
 - **Default behavior unchanged:** Without `pdu_only: true`, frames are parsed as before
-- **Feature detection:** LNS can check for `pdu-only` in features before enabling
+- **Feature detection:** LNS can check for `pdu-conf` in features before enabling
 - **Old stations:** Will ignore unknown `pdu_only` field in router_config
 - **Old LNS:** Will not send `pdu_only`, so station uses standard parsing
 
