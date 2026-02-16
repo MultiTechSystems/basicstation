@@ -40,7 +40,9 @@ DEPS=${SRCS:.c=.d}
 
 all: ${TARGET}
 
-../bin/station: station_main.c ../lib/libs2core.a $(wildcard ../lib/*.a)
+# Note: Don't use wildcard ../lib/*.a as it would include HAL libraries even for simulators
+# The LIBS variable should specify all required libraries
+../bin/station: station_main.c ../lib/libs2core.a
 	@echo " [${ARCH}] CC   $@" ${NQ}
 	${Q}${CC} ${CFLAGS} ${LDFLAGS} $^ ${LIBS} -o $@
 	@echo " platform=${platform} variant=${variant} STATION EXE built"

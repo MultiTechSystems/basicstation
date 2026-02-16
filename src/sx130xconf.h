@@ -39,6 +39,10 @@
 #include "s2conf.h"
 #include "ral.h" //chdefl_t
 
+// Compatibility between SX1301 (LGW_LBT_ISSUE) and SX1302 (LGW_LBT_NOT_ALLOWED) HALs
+#ifndef LGW_LBT_ISSUE
+#define LGW_LBT_ISSUE LGW_LBT_NOT_ALLOWED
+#endif
 
 #define SX130X_ANT_NIL    0
 #define SX130X_ANT_OMNI   1

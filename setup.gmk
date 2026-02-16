@@ -91,9 +91,9 @@ CFG.arm-linux-gnueabihf = linux
 #  testms1302 - testms with SF5/SF6 support (master-slave with SX1302/SX1303)
 #  All test variants include 'testing' flag for simplified conditional compilation
 CFG.testsim = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw testing
-CFG.testsim1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw sf5sf6 testing
+CFG.testsim1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim1302 ral_lgw sx1302 sf5sf6 testing
 CFG.testms  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave testing
-CFG.testms1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_master_slave sf5sf6 testing
+CFG.testms1302 = logini_lvl=DEBUG selftests tlsdebug lgwsim1302 ral_master_slave sx1302 sf5sf6 testing
 CFG.testfs  = logini_lvl=DEBUG selftests tlsdebug lgwsim ral_lgw
 CFG.testpin = logini_lvl=INFO tlsdebug ral_lgw testpin
 CFG.std     = logini_lvl=INFO tlsdebug ral_lgw
@@ -121,8 +121,13 @@ DEPS.linuxV2 = mbedtls lgw2 nanopb
 DEPS.corecell = mbedtls lgw1302 nanopb
 DEPS.rpi     = mbedtls lgw nanopb
 DEPS.rpi64   = mbedtls lgw nanopb
+# Test variant overrides - testsim1302/testms1302 use SX1302 HAL headers
+DEPS.testsim = mbedtls lgw nanopb
+DEPS.testsim1302 = mbedtls lgw1302 nanopb
+DEPS.testms = mbedtls lgw nanopb
+DEPS.testms1302 = mbedtls lgw1302 nanopb
 
-DEPS = $(or ${DEPS.${platform}}, ${DEPS.default})
+DEPS = $(or ${DEPS.${variant}}, ${DEPS.${platform}}, ${DEPS.default})
 
 PERSO.default =
 PERSO  = $(or ${PERSO.${platform}}, ${PERSO.default})
@@ -156,12 +161,18 @@ LIBS.corecell = -llgw1302  ${MBEDLIBS} ${NANOPBLIBS}      -lpthread -lrt
 LIBS.rpi     = -llgw   ${MBEDLIBS} ${NANOPBLIBS}      -lpthread
 LIBS.rpi64   = -llgw   ${MBEDLIBS} ${NANOPBLIBS}      -lpthread
 LIBS.kerlink = -llgw   ${MBEDLIBS} ${NANOPBLIBS} -lrt -lpthread
+# Simulator variants don't link against HAL library - lgwsim/lgwsim1302 provides implementations
+LIBS.testsim = ${MBEDLIBS} ${NANOPBLIBS} -lpthread
+LIBS.testsim1302 = ${MBEDLIBS} ${NANOPBLIBS} -lpthread
+LIBS.testms = ${MBEDLIBS} ${NANOPBLIBS} -lpthread
+LIBS.testms1302 = ${MBEDLIBS} ${NANOPBLIBS} -lpthread
 
 xCFG     =     ${CFG.${ARCH}}     ${CFG.${platform}}     ${CFG.${variant}}    ${CFG.${platform}.${variant}}
 xCFLAGS  =  ${CFLAGS.${ARCH}}  ${CFLAGS.${platform}}  ${CFLAGS.${variant}} ${CFLAGS.${platform}.${variant}}
 xINCS    =    ${INCS.${ARCH}}    ${INCS.${platform}}    ${INCS.${variant}}
 xLDFLAGS = ${LDFLAGS.${ARCH}} ${LDFLAGS.${platform}} ${LDFLAGS.${variant}}
-xLIBS    =    ${LIBS.${ARCH}}    ${LIBS.${platform}}    ${LIBS.${variant}}
+# For simulators, variant-specific LIBS takes precedence over platform LIBS
+xLIBS    = ${LIBS.${ARCH}} $(if ${LIBS.${variant}},${LIBS.${variant}},${LIBS.${platform}})
 xFILES   =   ${FILES.${ARCH}}   ${FILES.${platform}}   ${FILES.${variant}}
 xOCFLAGS = ${OCFLAGS.${ARCH}} ${OCFLAGS.${platform}} ${OCFLAGS.${variant}}
 
