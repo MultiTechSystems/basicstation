@@ -1078,8 +1078,9 @@ static void startupMaster2 (tmr_t* tmr) {
 #if defined(CFG_prod)
     rt_addFeature("prod");  // certain development/test/debug features not accepted
 #endif
+    rt_addFeature("mts");  // MultiTech Systems fork identifier
 #if !defined(CFG_nogps)
-    rt_addFeature("gps-ctrl");  // LNS can control GPS enable/disable
+    rt_addFeature("gps-conf");  // LNS can configure GPS enable/disable
 #endif
     sys_enableCmdFIFO(makeFilepath("~/cmd",".fifo",NULL,0));
     if( gpsEnabled && deviceGPSSupport()) {
