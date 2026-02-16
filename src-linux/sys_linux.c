@@ -1083,6 +1083,7 @@ static void startupMaster2 (tmr_t* tmr) {
 #if defined(CFG_prod)
     rt_addFeature("prod");  // certain development/test/debug features not accepted
 #endif
+    rt_addFeature("mts");  // MultiTech Systems fork identifier
     sys_enableCmdFIFO(makeFilepath("~/cmd",".fifo",NULL,0));
 #if defined(CFG_usegpsd)
     if( gpsEnabled && deviceGPSSupport()) {
