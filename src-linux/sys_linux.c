@@ -1022,7 +1022,8 @@ static void startupMaster2 (tmr_t* tmr) {
 #if defined(CFG_prod)
     rt_addFeature("prod");  // certain development/test/debug features not accepted
 #endif
-    rt_addFeature("dutyconf");  // supports duty_cycle_enabled in router_config
+    rt_addFeature("mts");  // MultiTech Systems fork identifier
+    rt_addFeature("duty-conf");  // duty cycle configurable via router_config
     sys_enableCmdFIFO(makeFilepath("~/cmd",".fifo",NULL,0));
     if( gpsDevice ) {
         rt_addFeature("gps");
