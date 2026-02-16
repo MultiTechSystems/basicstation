@@ -1022,7 +1022,8 @@ static void startupMaster2 (tmr_t* tmr) {
 #if defined(CFG_prod)
     rt_addFeature("prod");  // certain development/test/debug features not accepted
 #endif
-    rt_addFeature("pdu-only");  // supports raw PDU mode via pdu_only in router_config
+    rt_addFeature("mts");  // MultiTech Systems fork identifier
+    rt_addFeature("pdu-conf");  // PDU mode configurable via router_config
     sys_enableCmdFIFO(makeFilepath("~/cmd",".fifo",NULL,0));
     if( gpsDevice ) {
         rt_addFeature("gps");
