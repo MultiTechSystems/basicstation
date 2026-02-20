@@ -46,12 +46,6 @@ These features indicate the gateway will honor corresponding fields in `router_c
 
 ## Protocol Support
 
-### Legacy
-
-| Feature | Description |
-|---------|-------------|
-| `pkt-fwd` | Legacy Semtech UDP packet forwarder protocol support |
-
 ### LBS (LoRa Basic Station) Protocol
 
 | Feature | Description |
